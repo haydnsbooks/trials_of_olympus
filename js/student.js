@@ -209,7 +209,17 @@
   function showCabinet() {
     stopPolling();
     loading('Polishing your trophies…');
-    API.call('cabinet', { token: S.session.token }).then(function (r) { drawCabinet(r.cabinet); }).catch(fail);
+    Promise.all([API.call('cabinet', { token: S.session.token }), API.call('profile', { token: S.session.token })]).then(function (all) {
+      S.session.profile = all[1].profile; S.session.rules = all[1].rules; saveSession();
+      drawCabinet(all[0].cabinet);
+    }).catch(fail);
+  }
+
+  /** Levels fluent right now across all four operations (the same ✅ count as My levels). */
+  function fluentCount() {
+    var n = 0, total = 0;
+    Levels.ORDER.forEach(function (op) { S.session.profile[op].levels.forEach(function (st) { total++; if (st.fluent) n++; }); });
+    return { n: n, total: total };
   }
 
   function shelvesHtml(list, slot, minShelves) {
@@ -228,6 +238,7 @@
     var byId = {}; items.forEach(function (t) { byId[t.id] = t; });
     var sel = byId[selectedId] || null;
     var lockDay = perthDate(wk.locksAt - 1, { weekday: 'long', day: 'numeric', month: 'short' });
+    var fc = fluentCount();
 
     var weekSlot = function (t) {
       return '<button class="trophy-slot' + (t.id === wk.keeper ? ' keeper' : '') + (sel && t.id === sel.id ? ' selected' : '') + '" data-id="' + esc(t.id) + '" aria-label="' + esc(Celebrate.trophyName(t)) + '">' +
@@ -254,6 +265,7 @@
     render('<div class="card wide cabinet-card">' + backBtn('Menu') +
       '<h2 class="center">🏆 My Trophy Cabinet</h2>' +
       (message || '') +
+      '<p class="cab-help center">⚡ You\'re fluent in <b>' + fc.n + ' of ' + fc.total + '</b> levels across all four operations. Every fluent level is another step up Mount Olympus!</p>' +
       '<h3 class="cab-head">This week\'s trophies</h3>' +
       '<p class="cab-help">' + (items.length
         ? 'Keep <b>one</b> trophy each week. Tap a trophy, then <b>⭐ Keep this one</b>. At midnight on <b>' + esc(lockDay) + '</b> your ⭐ trophy is locked into your cabinet for good and the others are cleared.' +
@@ -372,7 +384,8 @@
   }
 
   /* ---------- class game (multiplayer) ---------- */
-  var LEAVE_MSG = 'Leave this round? Your score won\'t count.';
+  var LEAVE_DONE_MSG = 'You\'re about to leave the lobby.\n\nAre all the rounds finished? Press OK only if they are.';
+  var LEAVE_MSG = LEAVE_DONE_MSG + '\n\nYour score for this round won\'t count.';
 
   function showMultiplayer() {
     stopPolling();
@@ -417,6 +430,9 @@
     showMenu();
   }
 
+  /** Leave buttons once a round has been played: check all the rounds are finished first. */
+  function askLeave() { if (window.confirm(LEAVE_DONE_MSG)) leaveRoom(); }
+
   function roomClosed() {
     S.mp = null;
     render('<div class="card temple narrow center"><div class="big-emoji">🏛️</div><h2>The class game has finished</h2><button class="btn primary" id="menu">Back to menu</button></div>');
@@ -447,7 +463,7 @@
           '<p class="count-line" data-count></p>' +
           '<p class="muted small">Keep this screen open. The game starts by itself.</p>' +
           '<button class="btn ghost" id="leave">← Leave the room</button></div>',
-        function () { on('#leave', 'click', leaveRoom); });
+        function () { on('#leave', 'click', room.round > 0 ? askLeave : leaveRoom); });
       var c = app.querySelector('[data-count]'); if (c) c.textContent = room.playerCount + ' player' + (room.playerCount === 1 ? '' : 's') + ' in the room';
       return poll(C.LOBBY_POLL_MS);
     }
@@ -455,7 +471,7 @@
       if (!g.inGame) {
         setView('spectate' + room.round, '<div class="card temple narrow center">' + inRoomBanner('You\'re in the game room') +
           '<div class="big-emoji">🍿</div><h2>A round is already running</h2><p>You\'ll be in the next round.</p>' +
-          '<button class="btn ghost" id="leave">← Leave the room</button></div>', function () { on('#leave', 'click', leaveRoom); });
+          '<button class="btn ghost" id="leave">← Leave the room</button></div>', function () { on('#leave', 'click', room.round > 1 ? askLeave : leaveRoom); });
         return poll(C.RESULTS_POLL_MS);
       }
       if (room.submitted || mp.doneRound === room.round) { waiting(); return poll(C.RESULTS_POLL_MS); }
@@ -470,7 +486,7 @@
         Celebrate.results(app.querySelector('#res'), { teams: room.results.teams, myTeam: room.results.myTeam, me: room.results.me,
                                                        penalty: rules().wrongPenaltySec, odds: odds() });
         bindDecisions(app, decidedOnResults);
-        on('#leave', 'click', leaveRoom);
+        on('#leave', 'click', askLeave);
       }
       return poll(C.RESULTS_POLL_MS);
     }

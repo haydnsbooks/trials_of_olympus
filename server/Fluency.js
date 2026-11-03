@@ -14,7 +14,9 @@
  *   fluent         = at least MIN_ATTEMPTS_FOR_FLUENCY attempts (currently 1) AND fluency time <= cut-off
  *   current level  = the LOWEST level that is not fluent, counting levels never tried as not fluent
  *                    (e.g. L1 1.2 s, L2 1.1 s, nothing else tried, cut-off 3 s -> Level 3).
- *                    Dusty levels still pull a student back to revise them.
+ *                    Dusty levels still pull a student back to revise them (My levels, Practice, Class levels).
+ *   class level    = the level used in class rounds and team balancing: the same rule, but IGNORING dust
+ *                    (a level counts as fluent if its average alone is at or under the cut-off).
  */
 
 function round2_(x) { return Math.round(x * 100) / 100; }
@@ -42,7 +44,7 @@ function rawTime_(seconds, correct, wrong) {
 function attemptTime_(seconds, correct, wrong) { return round2_(rawTime_(seconds, correct, wrong)); }
 
 function levelStats_(entry, cutoff, now) {
-  if (!entry || !entry.r || !entry.r.length) return { attempts: 0, avg: null, dust: 0, time: null, fluent: false, last: null };
+  if (!entry || !entry.r || !entry.r.length) return { attempts: 0, avg: null, dust: 0, time: null, fluent: false, cleanFluent: false, last: null };
   var r = entry.r.slice(-CONFIG.RECENT_ATTEMPTS);
   var avg = r.reduce(function (a, b) { return a + b; }, 0) / r.length;
   var dust = dustFor_(entry.t, now);
@@ -55,21 +57,25 @@ function levelStats_(entry, cutoff, now) {
     dust: dust,
     time: round2_(time),
     fluent: r.length >= need && time <= cutoff,
+    cleanFluent: r.length >= need && avg <= cutoff, // fluent if dust is ignored
     last: entry.t || null
   };
 }
 
-/** Summary of one operation: {current, mastered, cutoff, levels:[{level, attempts, avg, dust, time, fluent}]} */
+/** Summary of one operation: {current, mastered, classLevel, classMastered, cutoff, levels:[{level, attempts, avg, dust, time, fluent, cleanFluent}]}
+ *  current counts dust; classLevel ignores it (class rounds and team balancing use classLevel). */
 function opSummary_(profile, op, cutoff, now) {
-  var n = CONFIG.LEVEL_COUNTS[op], levels = [], current = null;
+  var n = CONFIG.LEVEL_COUNTS[op], levels = [], current = null, classLevel = null;
   var data = (profile && profile[op]) || {};
   for (var L = 1; L <= n; L++) {
     var st = levelStats_(data[L], cutoff, now);
     st.level = L;
     levels.push(st);
     if (current === null && !st.fluent) current = L;
+    if (classLevel === null && !st.cleanFluent) classLevel = L;
   }
-  return { current: current === null ? n : current, mastered: current === null, cutoff: cutoff, levels: levels };
+  return { current: current === null ? n : current, mastered: current === null,
+           classLevel: classLevel === null ? n : classLevel, classMastered: classLevel === null, cutoff: cutoff, levels: levels };
 }
 
 /** What the student app displays. */
@@ -91,12 +97,12 @@ function recordAttempt_(profile, op, level, time, now) {
 }
 
 /**
- * Expected seconds-per-correct at the student's current level for this operation (used to balance teams).
+ * Expected seconds-per-correct at the student's class level for this operation (used to balance teams).
  * = average of their recent attempts at that level (+ dust only if CONFIG.BALANCE_ADD_DUST).
  * Never played that level: cut-off + UNKNOWN_EXTRA (an estimate, not a measurement).
  */
 function expectedTime_(summary) {
-  var st = summary.levels[summary.current - 1];
+  var st = summary.levels[summary.classLevel - 1];
   if (st.avg === null) return round2_(summary.cutoff + CONFIG.UNKNOWN_EXTRA);
   return CONFIG.BALANCE_ADD_DUST ? st.time : st.avg;
 }

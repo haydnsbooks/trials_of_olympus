@@ -9,7 +9,7 @@
 var CONFIG = {
   // Which version of the server code this is. js/config.js has the matching SERVER_VERSION; if they differ,
   // the teacher page shows a warning that Apps Script is running old code. Change BOTH when the server changes.
-  SERVER_VERSION: 9,
+  SERVER_VERSION: 10,
 
   // Number of levels per operation. Must match js/levels.js.
   LEVEL_COUNTS: { mul: 18, div: 18, add: 13, sub: 11 },
@@ -30,9 +30,10 @@ var CONFIG = {
   WRONG_PENALTY_SEC: 1,
 
   // ---- Team balancing ----
-  // Each student's expected seconds-per-correct = their average time at THEIR current level for the chosen operation.
+  // Each student's class level for the chosen operation = their lowest level that is not fluent, ignoring dust.
+  // Their expected seconds-per-correct = their average time at THAT level.
   // Teams are formed so the teams' average expected times are as close as possible (lowest standard deviation).
-  // If a student has never played their current level, expected = cut-off + UNKNOWN_EXTRA.
+  // If a student has never played their class level, expected = cut-off + UNKNOWN_EXTRA.
   UNKNOWN_EXTRA: 1.5,
   BALANCE_ADD_DUST: false,     // false = balance on the real average of recent attempts; true = average + dust (the "fluency time")
   BALANCE_RESTARTS: 40,        // how many different starting line-ups the balancer tries (more = more even, slightly slower)

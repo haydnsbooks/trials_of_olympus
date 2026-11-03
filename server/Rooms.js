@@ -69,7 +69,8 @@ function pruneAbsent_(room) {
 /*
  * Goal (Haydn's rule): every team's AVERAGE expected time per correct answer should be as close as possible,
  * i.e. the standard deviation of the team averages is as low as possible. Each player's expected time is their
- * average at their OWN current level for the chosen operation, so students on different levels mix freely.
+ * average at their OWN class level for the chosen operation (lowest level not fluent, ignoring dust),
+ * so students on different levels mix freely.
  *   e.g. A: L7 4.5 s, B: L3 7.2 s, C: L14 3.7 s  ->  team average (4.5 + 7.2 + 3.7) / 3 = 5.13 s
  *
  * Method: several starting line-ups (a snake draft, then random deals). From each one, keep making the single
@@ -261,12 +262,12 @@ function leaveRoom_(code, id) {
   try { return removePlayer_(code, id); } catch (e) { return null; } // room already closed: nothing to do
 }
 
-/** Each player's current level and expected seconds per correct answer for this operation. */
+/** Each player's class level (lowest level not fluent, ignoring dust) and expected seconds per correct answer at it. */
 function playerStats_(ids, op) {
   var profiles = getProfiles_(ids), cutoff = cutoffs_()[op], now = Date.now(), out = {};
   ids.forEach(function (id) {
     var sum = opSummary_(profiles[id], op, cutoff, now);
-    out[id] = { level: sum.current, exp: expectedTime_(sum), est: sum.levels[sum.current - 1].avg === null };
+    out[id] = { level: sum.classLevel, exp: expectedTime_(sum), est: sum.levels[sum.classLevel - 1].avg === null };
   });
   return out;
 }
@@ -433,7 +434,7 @@ function finishGame_(code) {
       var t = attemptTime_(sub.s, sub.c, sub.w);
       var saved = sub.s >= CONFIG.MIN_ATTEMPT_SECONDS;
       var p = profiles[id] = profiles[id] || {};
-      var before = opSummary_(p, g.op, cutoff, now).current;
+      var before = opSummary_(p, g.op, cutoff, now).classLevel;
       if (saved) {
         recordAttempt_(p, g.op, a.level, t, now);
         updates[id] = p;
@@ -443,7 +444,7 @@ function finishGame_(code) {
       }
       var after = opSummary_(p, g.op, cutoff, now);
       personal[id] = { correct: sub.c, wrong: sub.w, penalty: sub.w * CONFIG.WRONG_PENALTY_SEC, avgTime: sub.c > 0 ? t : null,
-                       level: a.level, saved: saved, newLevel: after.current, levelUp: after.current > before, mastered: after.mastered };
+                       level: a.level, saved: saved, newLevel: after.classLevel, levelUp: after.classLevel > before, mastered: after.classMastered };
     });
 
     var teams = g.teams.map(function (tm, i) {

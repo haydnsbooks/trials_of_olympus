@@ -381,15 +381,27 @@ test('dusty lower level becomes the current level again', () => {
   const sum = F('opSummary_')(prof, 'mul', 3, now);
   assert.strictEqual(sum.current, 1);
 });
-test('team balancing uses the real average at the current level (dust not added unless BALANCE_ADD_DUST)', () => {
+test('team balancing uses the real average at the class level (dust not added unless BALANCE_ADD_DUST)', () => {
   const now = perth(2026, 10, 22, 10);
-  const prof = { mul: { 1: { r: [3.5, 3.5, 3.5], n: 3, t: perth(2026, 10, 1, 10) } } }; // 3 weeks of dust
+  const prof = { mul: { 1: { r: [4.5, 4.5, 4.5], n: 3, t: perth(2026, 10, 1, 10) } } }; // 3 weeks of dust
   const sum = F('opSummary_')(prof, 'mul', 4, now);
-  assert.strictEqual(sum.current, 1);
-  assert.strictEqual(F('expectedTime_')(sum), 3.5);
+  assert.strictEqual(sum.classLevel, 1);
+  assert.strictEqual(F('expectedTime_')(sum), 4.5);
   F('CONFIG').BALANCE_ADD_DUST = true;
-  assert.strictEqual(F('expectedTime_')(sum), 5);
+  assert.strictEqual(F('expectedTime_')(sum), 6);
   F('CONFIG').BALANCE_ADD_DUST = false;
+});
+test('class level ignores dust: dusty fluent levels do not pull a student back in class rounds', () => {
+  const now = perth(2026, 10, 22, 10), old = perth(2026, 10, 1, 10); // 3 weeks of dust = +1.5 s
+  const prof = { mul: { 1: { r: [3, 3, 3], n: 3, t: old }, 2: { r: [3.5, 3.5, 3.5], n: 3, t: old }, 3: { r: [5, 5, 5], n: 3, t: now } } };
+  const sum = F('opSummary_')(prof, 'mul', 4, now);
+  assert.strictEqual(sum.current, 1, 'My levels still counts dust');
+  assert.strictEqual(sum.classLevel, 3, 'L1 and L2 average under the 4 s cut-off, so class level = 3');
+  assert.strictEqual(F('expectedTime_')(sum), 5, 'time comes from the class level, with no dust');
+  const all = {}; for (let L = 1; L <= 18; L++) all[L] = { r: [2], n: 1, t: old };
+  const top = F('opSummary_')({ mul: all }, 'mul', 3, now);
+  assert.strictEqual(top.classLevel, 18); assert.strictEqual(top.classMastered, true);
+  assert.strictEqual(top.mastered, false, 'dust still un-masters levels in My levels');
 });
 test('fluency uses only the 3 most recent attempts', () => {
   const p = {}; const rec = F('recordAttempt_');
@@ -719,6 +731,24 @@ test('no points anywhere in what the server sends', () => {
   const r = ok(call({ action: 'teacherInfo', teacherToken: teacher }));
   assert(!JSON.stringify(r).match(/point|rankBy/i), JSON.stringify(r.rules));
   assert.strictEqual(r.rules.wrongPenaltySec, 1);
+});
+
+test('class round: dusty student gets the no-dust level, its time balances the teams, and level-up matches', () => {
+  const now = Date.now(), old = now - 21 * 86400000, id = ids[10]; // 3 weeks ago: 1.5 s of dust
+  const p = F('getProfile_')(id);
+  p.div = { 1: { r: [3, 3, 3], n: 3, t: old }, 2: { r: [5, 5, 5], n: 3, t: old } };
+  F('saveProfiles_')({ [id]: p });
+  assert.strictEqual(F('opSummary_')(p, 'div', 4, now).current, 1, 'test set-up: dust makes level 1 not fluent');
+  const room = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'div', seconds: 60, teams: 3 })).room;
+  const m = [].concat(...room.game.teams.map(t => t.members)).find(x => x.name === nameOf[id]);
+  assert.strictEqual(m.level, 2, 'should play the lowest level not fluent, ignoring dust');
+  assert.strictEqual(m.exp, 5, 'expected time should be the level 2 average with no dust');
+  assert.strictEqual(m.est, false);
+  assert.strictEqual(ok(call({ action: 'roomState', token: tokens[id] })).room.game.level, 2);
+  submitAll(() => ({ correct: 30 })); // 2 s each: fluent at level 2
+  ok(call({ action: 'finishGame', teacherToken: teacher, code }));
+  const me = ok(call({ action: 'roomState', token: tokens[id] })).room.results.me;
+  assert.strictEqual(me.level, 2); assert.strictEqual(me.levelUp, true); assert.strictEqual(me.newLevel, 3);
 });
 
 /* ---------- 6. The single file Haydn pastes into Apps Script ---------- */

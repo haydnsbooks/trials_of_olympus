@@ -324,7 +324,7 @@
     roomEl().innerHTML = '<div class="card"><div class="spinner"></div></div>';
     call('classOverview').then(function (r) {
       roomEl().innerHTML = '<div class="card"><div class="row-between"><h2>📊 Class levels</h2><button class="btn ghost" id="back">← Back to game</button></div>' +
-        '<p class="muted">Current level (lowest level not yet fluent) and its fluency time. 🧹 = dust included.</p>' +
+        '<p class="muted">Current level (lowest level not yet fluent) and its fluency time. 🧹 = dust included. Class rounds ignore dust, so a student can play a higher level there.</p>' +
         '<div class="table-wrap"><table class="lv-table overview"><thead><tr><th>Student</th>' +
         Levels.ORDER.map(function (op) { return '<th>' + Levels.OPS[op].symbol + ' ' + Levels.OPS[op].name + '<small>cut-off ' + r.cutoffs[op] + ' s</small></th>'; }).join('') +
         '</tr></thead><tbody>' + r.rows.map(function (row) {
