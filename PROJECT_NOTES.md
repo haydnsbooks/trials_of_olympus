@@ -99,7 +99,7 @@
 
 ## v11 changes (4 Nov 2026, Haydn's request) — SERVER_VERSION 11
 - **Teams re-balance when the operation changes.** Cause: Play again's "Same teams" kept last round's members whatever operation came next (and that choice is the default and remembered), but teams are only balanced for the operation they were made for. Now in `playAgain_`, `teams: 'same'` with a different operation makes new balanced teams with the same number of teams and new names (`newTeams_` skips last round's names, so the change is visible). Same operation → same teams, as before. Individual play is unchanged.
-- Teacher page: when a different operation is picked, the first Teams option changes to "Re-balanced teams (N teams)" and the hint says so. The rule is on the server, so a cached teacher page gets it too.
+- Teacher page: when a different operation is picked, the first Teams option changes to "Re-balanced (N teams)" and the hint says so. The rule is on the server, so a cached teacher page gets it too.
 - Tests: new checks for re-balancing on a new operation. Not checked on a real iPad.
 
 ## Assumptions to confirm with Haydn

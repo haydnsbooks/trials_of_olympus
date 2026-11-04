@@ -229,7 +229,7 @@
   function sameLabel(g, op) {
     if (g.individual) return 'Same as last round (individual play)';
     var n = g.teamCount || g.teams.length;
-    return op === g.op ? 'Same teams (' + n + ' teams)' : 'Re-balanced teams (' + n + ' teams)';
+    return op === g.op ? 'Same teams (' + n + ' teams)' : 'Re-balanced (' + n + ' teams)';
   }
 
   function drawResults(room) {
