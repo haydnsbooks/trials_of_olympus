@@ -40,7 +40,7 @@ A class multiplayer maths fluency game. Every student answers questions at **the
 4. Students play. **No server traffic during play** — questions are generated on the iPad.
 5. When time is up, each iPad sends one small result. The teacher screen finishes the round (when all results are in, or after 15 s), which ranks teams, writes every attempt to the sheet in **one write**, updates profiles and hands out the winning team's trophy.
 6. Grand celebration on every screen, including the round's prize trophy. Winning players also see **"You won a trophy!"** and choose to put it in their cabinet or re-roll it. Teacher can tick **Show team members**.
-7. **Play again:** on the results screen, choose the next **operation**, **time** and **teams** (same teams, or new teams / individual) → **▶ Play round N**. Everyone still on the class-game screen goes straight into a 10-second countdown; students don't need to do anything. (**Back to lobby** and **Close room** are underneath.)
+7. **Play again:** on the results screen, choose the next **operation**, **time** and **teams** (same teams, or new teams / individual) → **▶ Play round N**. If the operation changes, "same teams" becomes **re-balanced teams** (same number of teams, new names), because teams are balanced for one operation. Everyone still on the class-game screen goes straight into a 10-second countdown; students don't need to do anything. (**Back to lobby** and **Close room** are underneath.)
 
 ## 3. The rules (as built)
 | Rule | Implementation | Where to change |
@@ -55,7 +55,7 @@ A class multiplayer maths fluency game. Every student answers questions at **the
 | Current level | **lowest** level that is not fluent — so a dusty earlier level pulls a student back to revise it (My levels, Practice, Class levels) | `opSummary_` in `server/Fluency.js` |
 | Class level | used in class rounds and team balancing: the same rule but **ignoring dust** | `classLevel` in `opSummary_` |
 | Team balancing | each student's expected time = their average at **their own** class level for the chosen operation (cut-off + 1.5 s if never played; dust not added). Teams are formed so the teams' average times have the **lowest possible standard deviation** (40 starting line-ups, then best swaps/moves). Sizes differ by at most 1 | `formTeams_` in `server/Rooms.js`, `BALANCE_*` in `server/Config.js` |
-| Play again | same teams (leavers drop out, newcomers join the smallest team) or new balanced teams; levels are worked out for the new operation | `playAgain_` in `server/Rooms.js` |
+| Play again | same operation: same teams (leavers drop out, newcomers join the smallest team) or new balanced teams. New operation: always new balanced teams (same number of teams unless the teacher picks another); individual play stays individual | `playAgain_` in `server/Rooms.js` |
 | Short games | games under 20 s (e.g. joined very late) aren't saved to profiles | `MIN_ATTEMPT_SECONDS` |
 | Practice | student picks operation → level; always 1 minute; saved to their profile (leaving early saves nothing) | `PRACTICE_SECONDS` in `js/config.js` |
 | Question order | small levels (e.g. a times table) are a shuffled deck: every fact once before any repeat, never the same fact twice in a row, wrong answers come back later in the deck. Huge levels are random with no repeats in a game | `Levels.deck` in `js/levels.js` |

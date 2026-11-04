@@ -598,7 +598,7 @@ test('Play again is refused from the lobby (use Start there)', () => {
   const r = call({ action: 'playAgain', teacherToken: teacher, code, op: 'add', seconds: 60, teams: 'same' });
   assert(!r.ok && /results screen/.test(r.error), r.error);
 });
-test('Play again, SAME teams, new operation + time: everyone still here plays, nobody re-joins', () => {
+test('Play again, SAME teams, same operation, new time: everyone still here plays, nobody re-joins', () => {
   goQuiet(code, ids[9]); // not on the class-game screen when the round starts
   ok(call({ action: 'startGame', teacherToken: teacher, code, op: 'mul', teams: 3, seconds: 60 }));
   ok(call({ action: 'joinRoom', token: tokens[ids[9]] })); // arrives mid-round, waits for the next one
@@ -607,10 +607,10 @@ test('Play again, SAME teams, new operation + time: everyone still here plays, n
   assert.strictEqual(fin.status, 'results');
   const before = teamsByName(fin), lastRound = fin.round;
   ok(call({ action: 'leaveRoom', token: tokens[ids[4]] })); // leaves on the results screen
-  const room = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'add', seconds: 90, teams: 'same' })).room;
+  const room = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'mul', seconds: 90, teams: 'same' })).room;
   assert.strictEqual(room.status, 'playing');
   assert.strictEqual(room.round, lastRound + 1);
-  assert.strictEqual(room.game.op, 'add');
+  assert.strictEqual(room.game.op, 'mul');
   assert.strictEqual(room.game.seconds, 90);
   assert.strictEqual(room.game.expected, 11, '12 in the room, minus the one who left');
   const after = teamsByName(room);
@@ -625,13 +625,40 @@ test('Play again, SAME teams, new operation + time: everyone still here plays, n
   const sv = ok(call({ action: 'roomState', token: tokens[ids[0]] })).room; // the student's normal results-screen poll
   assert.strictEqual(sv.status, 'playing');
   assert.strictEqual(sv.game.inGame, true);
-  assert.strictEqual(sv.game.op, 'add');
+  assert.strictEqual(sv.game.op, 'mul');
   assert(sv.game.startAt - Date.now() > 8000, 'countdown too short for students on the results screen');
-  const again = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'add', seconds: 90, teams: 'same' })).room;
+  const again = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'mul', seconds: 90, teams: 'same' })).room;
   assert.strictEqual(again.round, room.round, 'pressing Play again twice started two rounds');
   ok(call({ action: 'joinRoom', token: tokens[ids[4]] })); // back for later rounds
   submitAll(() => ({ correct: 15 }));
   ok(call({ action: 'finishGame', teacherToken: teacher, code }));
+});
+test('Play again, SAME teams, new operation: teams are re-balanced, same number of teams, new names', () => {
+  ok(call({ action: 'startGame', teacherToken: teacher, code, op: 'mul', teams: 3, seconds: 60 }));
+  submitAll(() => ({ correct: 15 }));
+  const fin = ok(call({ action: 'finishGame', teacherToken: teacher, code })).room;
+  const before = teamsByName(fin);
+  ok(call({ action: 'leaveRoom', token: tokens[ids[4]] }));
+  const room = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'add', seconds: 60, teams: 'same' })).room;
+  assert.strictEqual(room.game.op, 'add');
+  assert.strictEqual(room.game.teams.length, 3, 'number of teams changed');
+  assert.strictEqual(room.game.individual, false);
+  assert.strictEqual(room.game.expected, 11, 'student who left was put in a team');
+  assert(typeof room.game.balanceSd === 'number', 'teams were not balanced');
+  const after = teamsByName(room);
+  Object.keys(after).forEach(name => assert(!before[name], 'team name reused: ' + name));
+  const sizes = Object.values(after).map(m => m.length);
+  assert(Math.max(...sizes) - Math.min(...sizes) <= 1, 'sizes differ by more than 1: ' + sizes);
+  assert(!Object.values(after).flat().includes(nameOf[ids[4]]), 'student who left is still in a team');
+  room.game.teams.forEach(t => t.members.forEach(m => assert(m.level >= 1)));
+  ok(call({ action: 'joinRoom', token: tokens[ids[4]] }));
+  submitAll(() => ({ correct: 15 }));
+  ok(call({ action: 'finishGame', teacherToken: teacher, code }));
+});
+test('teams are built from each student\'s expected time for the NEW operation', () => {
+  const stats = { a: { exp: 2 }, b: { exp: 2 }, c: { exp: 8 }, d: { exp: 8 } };
+  const t = F('newTeams_')(['a', 'b', 'c', 'd'], stats, 2, {});
+  t.groups.forEach(g => assert.strictEqual(g.reduce((s, id) => s + stats[id].exp, 0), 10, 'teams not even: ' + JSON.stringify(t.groups)));
 });
 test('Play again, NEW teams: chosen number of balanced teams, or individual', () => {
   let room = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'div', seconds: 60, teams: 4 })).room;
