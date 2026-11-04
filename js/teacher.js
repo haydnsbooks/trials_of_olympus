@@ -213,8 +213,11 @@
   }
 
   /** What the Teams choice on the Play again panel will do. */
-  function againHint(value, g) {
+  function againHint(value, g, op) {
     if (value === 'same') {
+      if (!g.individual && op !== g.op) {
+        return 'New operation, so new teams are made: still ' + (g.teamCount || g.teams.length) + ' teams, balanced for this operation.';
+      }
       return (g.individual ? 'Everyone plays solo again, with the same code names.' : 'The same teams play again.') +
         ' Anyone who has left drops out; anyone new joins ' + (g.individual ? 'with their own code name' : 'the smallest team') + '.';
     }
@@ -222,11 +225,17 @@
     return 'New teams, balanced so each team\'s average time per correct answer (from everyone\'s own level for this operation) is as even as possible.';
   }
 
+  /** Wording of the first Teams choice. Teams only stay the same while the operation does. */
+  function sameLabel(g, op) {
+    if (g.individual) return 'Same as last round (individual play)';
+    var n = g.teamCount || g.teams.length;
+    return op === g.op ? 'Same teams (' + n + ' teams)' : 'Re-balanced (' + n + ' teams)';
+  }
+
   function drawResults(room) {
     stop();
     var g = room.game || {};
-    var sameLabel = g.individual ? 'Same as last round (individual play)' : 'Same teams (' + (g.teamCount || g.teams.length) + ' teams)';
-    var teamOptions = [['same', sameLabel]].concat(C.TEAM_COUNTS.map(function (n) { return [n, n <= 1 ? 'New: individual play' : 'New: ' + n + ' teams']; }));
+    var teamOptions = [['same', sameLabel(g, g.op)]].concat(C.TEAM_COUNTS.map(function (n) { return [n, n <= 1 ? 'New: individual play' : 'New: ' + n + ' teams']; }));
     var teamsValue = T.againTeams === 'same' || C.TEAM_COUNTS.indexOf(Number(T.againTeams)) >= 0 ? T.againTeams : 'same';
     roomEl().innerHTML = '<div class="card wide" id="res"></div>' +
       '<section class="card wide again-card">' +
@@ -248,8 +257,13 @@
     };
     draw(T.shownResultsRound !== room.round);
     T.shownResultsRound = room.round;
-    var hint = function () { app.querySelector('#a-hint').textContent = againHint(app.querySelector('#a-teams').value, g); };
+    var hint = function () {
+      var op = app.querySelector('#a-op').value;
+      app.querySelector('#a-teams option[value="same"]').textContent = sameLabel(g, op);
+      app.querySelector('#a-hint').textContent = againHint(app.querySelector('#a-teams').value, g, op);
+    };
     hint();
+    on('#a-op', 'change', hint);
     on('#a-teams', 'change', function () { T.againTeams = app.querySelector('#a-teams').value; save(); hint(); });
     on('#mem', 'change', function (e) { T.showMembers = e.target.checked; draw(false); });
     on('#again', 'click', function () {

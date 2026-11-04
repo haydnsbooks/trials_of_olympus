@@ -311,9 +311,9 @@ function numTeamsFor_(n, teamCount, legacyTeamSize) {
 }
 
 /** New, balanced teams from everyone in the room. */
-function newTeams_(ids, stats, numTeams) {
+function newTeams_(ids, stats, numTeams, avoidNames) {
   var groups = formTeams_(ids.map(function (id) { return { id: id, time: stats[id].exp }; }), numTeams);
-  return { groups: groups, labels: teamLabels_(groups.length) };
+  return { groups: groups, labels: teamLabels_(groups.length, avoidNames) };
 }
 
 /**
@@ -341,6 +341,8 @@ function startGame_(code, op, teamCount, seconds, legacyTeamSize) {
  * (students don't re-enter anything; their screens pick the new round up by themselves).
  * teams: 'same' = keep last round's teams (anyone who has left drops out; anyone new joins the smallest team,
  *        or plays solo if last round was individual), or a number of teams (0 = individual) for new balanced teams.
+ * Teams are balanced for one operation, so if the operation changes, 'same' makes new balanced teams with the
+ * same number of teams and different names. Individual play is unaffected.
  */
 function playAgain_(code, op, seconds, teams) {
   checkOp_(op);
@@ -355,7 +357,11 @@ function playAgain_(code, op, seconds, teams) {
     if (!ids.length) { saveRoom_(room); throw new Error('No students are in the room right now.'); }
     var stats = playerStats_(ids, op), plan = null;
 
-    if (String(teams) === 'same') {
+    if (String(teams) === 'same' && !prev.individual && op !== prev.op) {
+      var oldNames = {};
+      prev.teams.forEach(function (tm) { oldNames[tm.name] = true; });
+      plan = newTeams_(ids, stats, numTeamsFor_(ids.length, prev.teamCount), oldNames);
+    } else if (String(teams) === 'same') {
       var here = {}, placed = {}, kept = [];
       ids.forEach(function (id) { here[id] = true; });
       prev.teams.forEach(function (tm) {

@@ -9,7 +9,7 @@
 var CONFIG = {
   // Which version of the server code this is. js/config.js has the matching SERVER_VERSION; if they differ,
   // the teacher page shows a warning that Apps Script is running old code. Change BOTH when the server changes.
-  SERVER_VERSION: 10,
+  SERVER_VERSION: 11,
 
   // Number of levels per operation. Must match js/levels.js.
   LEVEL_COUNTS: { mul: 18, div: 18, add: 13, sub: 11 },

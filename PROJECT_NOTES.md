@@ -97,6 +97,11 @@
 - **Platinum message not added.** Haydn asked to tell students that more fluent levels raise the chance of platinum, while the odds stay fixed. That would be a false statement to students, so it wasn't built. Instead the cabinet shows the true count ("You're fluent in N of 60 levels across all four operations...", `fluentCount` in `js/student.js`; it counts the same ✅ levels as My levels, and the cabinet now also fetches the profile). If the odds ever really depend on fluent levels, the message becomes true and can be added.
 - Tests: new checks for class level vs dust, including a full class round. Checked in Chromium in demo mode (all pop-ups, Cancel and OK, cabinet at tablet and phone width). Not checked on a real iPad.
 
+## v11 changes (4 Nov 2026, Haydn's request) — SERVER_VERSION 11
+- **Teams re-balance when the operation changes.** Cause: Play again's "Same teams" kept last round's members whatever operation came next (and that choice is the default and remembered), but teams are only balanced for the operation they were made for. Now in `playAgain_`, `teams: 'same'` with a different operation makes new balanced teams with the same number of teams and new names (`newTeams_` skips last round's names, so the change is visible). Same operation → same teams, as before. Individual play is unchanged.
+- Teacher page: when a different operation is picked, the first Teams option changes to "Re-balanced (N teams)" and the hint says so. The rule is on the server, so a cached teacher page gets it too.
+- Tests: new checks for re-balancing on a new operation. Not checked on a real iPad.
+
 ## Assumptions to confirm with Haydn
 - Winner = lowest team time per correct answer (as specified), including 1 s per wrong answer (v9).
 - v9: wrong answers after the last correct answer still add 1 s; the penalty also applies to practice and fluency levels; re-roll is 5% platinum / 95% lost with no "stays gold" outcome; no weekly choice → best trophy (platinum, then newest) is kept; undecided trophies can still be decided in the cabinet until the week locks.

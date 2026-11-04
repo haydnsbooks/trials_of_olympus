@@ -8,7 +8,7 @@ window.APP_CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbw6v67ApYAtR9wygDcr2B3mqfZXnwQHWU8BVvD5TqagO6yoDPQ8GzzE1mPBXCmPjIUMxA/exec',
 
   // Must match SERVER_VERSION in server/Config.js. If Apps Script is running older code, the teacher page says so.
-  SERVER_VERSION: 10,
+  SERVER_VERSION: 11,
 
   // ---- Polling (how often screens ask the server "anything new?") ----
   // Each poll is a cache read on the server (no sheet access). Nothing is polled while a game is being played.
