@@ -115,7 +115,12 @@
 - **Teacher 📋 Levels page** (`showLevels` in `js/teacher.js`): every level of every operation with name, what it asks, a random example and how many different facts (or "Random"). Built from `js/levels.js`, so it stays up to date. `Levels.factCount` added.
 - Text updated: cut-offs page, Class levels page, My levels (dust 0.3 s), Practice level list.
 - Tests: 144 checks. Teacher Levels page checked in Chrome (demo mode). Not checked on a real iPad.
-- To confirm with Haydn: the a ranges (+: 1–10; −: answers 1–10), the new level names, and dropping the old L1–3 data.
+- To confirm with Haydn: the new level names, and dropping the old L1–3 data. (a ranges replaced in v13.)
+
+## v13 changes (18 Nov 2026, Haydn's requests) — SERVER_VERSION 13
+- **+ and − Levels 1–10: first number is random 1–20** (was 1–10 / answers 1–10). Subtraction: a = n to 20, so never negative (n − n = 0 can come up). 20 facts per + level, 21 − n per − level.
+- **Practice length per level:** 30 s on the first try; 30 s for good once fluency has been shown at that level; 60 s while played but not yet fluent. Server works it out (`practiceSecs` in `levelStats_`, `PRACTICE_SECONDS_SHORT/LONG` in `server/Config.js`). "Shown fluency" is saved as `f: true` on the level in the profile by `recordAttempt_` (fluency time without dust ≤ cut-off right after a practice OR class game). Profiles from before v13: counts as shown if their current average is at/under the cut-off. Dust doesn't bring back 60 s. Countdown shows "⏱ 30/60 seconds".
+- To confirm with Haydn: 0 answers allowed in − L1–10; a class game can also unlock 30 s; once 30 s, always 30 s (even if dust or slower games make them not fluent, or the cut-off is raised later).
 
 ## Assumptions to confirm with Haydn
 - Winner = lowest team time per correct answer (as specified), including 1 s per wrong answer (v9).

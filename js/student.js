@@ -294,10 +294,10 @@
     });
   }
 
-  /* ---------- practice (always C.PRACTICE_SECONDS = 30 s) ---------- */
+  /* ---------- practice: 30 s, or 60 s on a level played but not yet fluent (server sends practiceSecs per level) ---------- */
   function showPracticeOps(fresh) {
     stopPolling();
-    render('<div class="card" data-screen="ops">' + backBtn('Menu') + '<h2>Practice</h2><p class="muted">Choose an operation. Every practice round is ' + C.PRACTICE_SECONDS + ' seconds.</p><div class="op-grid">' + opButtons() + '</div></div>');
+    render('<div class="card" data-screen="ops">' + backBtn('Menu') + '<h2>Practice</h2><p class="muted">Choose an operation. A new level is 30 seconds. If you\'re not fluent yet, it\'s 60 seconds until you are, then 30 seconds after that.</p><div class="op-grid">' + opButtons() + '</div></div>');
     on('[data-back]', 'click', showMenu);
     onAll('[data-op]', 'click', function (b) { showPracticeLevels(b.getAttribute('data-op')); });
     if (!fresh) refreshProfile(function () { if (app.querySelector('[data-screen="ops"]')) showPracticeOps(true); });
@@ -328,8 +328,9 @@
   }
 
   async function runPractice(op, level) {
-    var secs = C.PRACTICE_SECONDS;
-    var started = await Game.countdown(app, Date.now() + 3000, Date.now, '<h2 class="count-title">' + esc(Levels.title(op, level)) + '</h2>');
+    var lvSt = S.session.profile[op] && S.session.profile[op].levels[level - 1];
+    var secs = (lvSt && lvSt.practiceSecs) || C.PRACTICE_SECONDS;
+    var started = await Game.countdown(app, Date.now() + 3000, Date.now, '<h2 class="count-title">' + esc(Levels.title(op, level)) + '</h2><p class="muted center">⏱ ' + secs + ' seconds</p>');
     if (!started) return showPracticeLevels(op);
     var res = await Game.play(app, { op: op, level: level, endAt: Date.now() + secs * 1000, clock: Date.now, rules: S.session.rules, label: Levels.title(op, level) });
     if (res.quit) return showPracticeLevels(op); // leaving early doesn't save anything

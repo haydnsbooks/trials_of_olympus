@@ -6,6 +6,7 @@
  *     r = seconds-per-correct for the most recent attempts (max CONFIG.RECENT_ATTEMPTS)
  *     n = total attempts ever at this level
  *     t = time of the last attempt (ms) — dust is counted from here
+ *     f = true once the student has shown fluency at this level (fluency time without dust <= cut-off straight after a game) (v13)
  *
  * Rules:
  *   attempt time   = (seconds played + WRONG_PENALTY_SEC (1 s) per wrong answer) / correct answers
@@ -19,6 +20,8 @@
  *                    (e.g. L1 1.2 s, L2 1.1 s, nothing else tried, cut-off 3 s -> Level 3).
  *                    Dusty levels pull a student back to revise them, everywhere: My levels, Practice,
  *                    Class levels AND class rounds (v12).
+ *   practice length= 30 s the first time a level is played and whenever fluency has ever been shown at it;
+ *                    60 s if it has been played but fluency has not been shown yet (v13).
  *   class level    = the level played in class rounds = current level (dust included, v12).
  *                    Team balancing uses the student's average at that level WITHOUT dust (expectedTime_).
  */
@@ -48,12 +51,14 @@ function rawTime_(seconds, correct, wrong) {
 function attemptTime_(seconds, correct, wrong) { return round2_(rawTime_(seconds, correct, wrong)); }
 
 function levelStats_(entry, cutoff, now) {
-  if (!entry || !entry.r || !entry.r.length) return { attempts: 0, avg: null, dust: 0, time: null, fluent: false, cleanFluent: false, last: null };
+  if (!entry || !entry.r || !entry.r.length) return { attempts: 0, avg: null, dust: 0, time: null, fluent: false, cleanFluent: false, shown: false, practiceSecs: CONFIG.PRACTICE_SECONDS_SHORT, last: null };
   var r = entry.r.slice(-CONFIG.RECENT_ATTEMPTS);
   var avg = r.reduce(function (a, b) { return a + b; }, 0) / r.length;
   var dust = dustFor_(entry.t, now);
   var time = avg + dust;
   var need = Math.min(CONFIG.MIN_ATTEMPTS_FOR_FLUENCY, CONFIG.RECENT_ATTEMPTS);
+  var clean = r.length >= need && avg <= cutoff;
+  var shown = !!entry.f || clean; // f is saved from v13; older profiles: fluent on their average right now
   return {
     attempts: entry.n || r.length,
     recent: r,
@@ -61,7 +66,9 @@ function levelStats_(entry, cutoff, now) {
     dust: dust,
     time: round2_(time),
     fluent: r.length >= need && time <= cutoff,
-    cleanFluent: r.length >= need && avg <= cutoff, // fluent if dust is ignored
+    cleanFluent: clean, // fluent if dust is ignored
+    shown: shown,       // has ever shown fluency at this level
+    practiceSecs: shown ? CONFIG.PRACTICE_SECONDS_SHORT : CONFIG.PRACTICE_SECONDS_LONG,
     last: entry.t || null
   };
 }
@@ -90,14 +97,19 @@ function profileView_(profile) {
   return out;
 }
 
-/** Adds one attempt to a profile object (mutates it). */
-function recordAttempt_(profile, op, level, time, now) {
+/** Adds one attempt to a profile object (mutates it). With a cut-off, also marks the level once fluency has been shown. */
+function recordAttempt_(profile, op, level, time, now, cutoff) {
   profile[op] = profile[op] || {};
   var e = profile[op][level] || { r: [], n: 0 };
   e.r.push(round2_(time));
   if (e.r.length > CONFIG.RECENT_ATTEMPTS) e.r = e.r.slice(-CONFIG.RECENT_ATTEMPTS);
   e.n = (e.n || 0) + 1;
   e.t = now;
+  if (cutoff !== undefined && !e.f) {
+    var need = Math.min(CONFIG.MIN_ATTEMPTS_FOR_FLUENCY, CONFIG.RECENT_ATTEMPTS);
+    var avg = e.r.reduce(function (a, b) { return a + b; }, 0) / e.r.length;
+    if (e.r.length >= need && avg <= cutoff) e.f = true;
+  }
   profile[op][level] = e;
 }
 

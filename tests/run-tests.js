@@ -25,8 +25,9 @@ const inR = (x, lo, hi) => x >= lo && x <= hi;
 const mulTables = [2, 10, 5, 3, 4, 11, 6, 7, 8, 9, 12];
 const big = [[13, 15], [16, 20], [21, 25], [26, 30], [31, 35], [36, 40]];
 // Levels 1-10 (v12): a + n with a = 1-10, b = n (no regrouping rule: null). a − n with answer 1-10.
-const smallAdd = Array.from({ length: 10 }, (_, i) => [1, 10, i + 1, i + 1, null]);
-const smallSub = Array.from({ length: 10 }, (_, i) => [i + 2, i + 11, i + 1, i + 1, null]);
+// v13: a = random 1-20; subtraction never below n (no negative answers).
+const smallAdd = Array.from({ length: 10 }, (_, i) => [1, 20, i + 1, i + 1, null]);
+const smallSub = Array.from({ length: 10 }, (_, i) => [i + 1, 20, i + 1, i + 1, null]);
 const addSpec = [...smallAdd, [10,99,10,99,true],[100,999,1,9,true],[100,999,10,99,true],[100,999,100,999,true],
   [1000,9999,10,99,true],[1000,9999,100,999,true],[1000,9999,1000,9999,true],[10000,99999,100,999,true],[10000,99999,1000,9999,true],[10000,99999,10000,99999,true]];
 const subSpec = [...smallSub, [10,99,10,99,false],[10,99,10,99,true],[100,999,1,9,false],[100,999,1,9,true],
@@ -820,6 +821,26 @@ test('migration happens when a saved profile is read', () => {
   const v = ok(call({ action: 'profile', token: tokens[id] })).profile;
   assert.strictEqual(v.add.levels[10].avg, 2, 'old Addition L4 is now L11');
   assert.strictEqual(v.add.levels[3].avg, null);
+});
+
+test('practice length: 30 s first try, 60 s while not fluent, 30 s for good once fluency is shown', () => {
+  const id = ids[9], tok = tokens[id];
+  const secs = () => ok(call({ action: 'profile', token: tok })).profile.add.levels[14].practiceSecs; // add L15, cut-off 5 s
+  assert.strictEqual(secs(), 30, 'never played');
+  ok(call({ action: 'practiceSubmit', token: tok, op: 'add', level: 15, correct: 5, wrong: 0, seconds: 30 })); // 6 s
+  assert.strictEqual(secs(), 60, 'played, not fluent');
+  ok(call({ action: 'practiceSubmit', token: tok, op: 'add', level: 15, correct: 15, wrong: 0, seconds: 60 })); // 4 s -> avg 5 s
+  assert.strictEqual(secs(), 30, 'fluent');
+  ok(call({ action: 'practiceSubmit', token: tok, op: 'add', level: 15, correct: 3, wrong: 0, seconds: 30 })); // 10 s -> avg 7 s
+  assert.strictEqual(secs(), 30, 'stays 30 s after fluency has been shown');
+  const p = F('getProfile_')(id); p.add[15].t -= 60 * 86400000; // lots of dust
+  assert.strictEqual(F('levelStats_')(p.add[15], 5, Date.now()).practiceSecs, 30);
+});
+test('subtraction L1-10: whole range 1-20 is used, never negative', () => {
+  const seen = new Set(); const d = Levels.deck('sub', 7);
+  for (let i = 0; i < 200; i++) { const q = d.next(); assert(q.answer >= 0); seen.add(q.pair[0]); }
+  assert.strictEqual(seen.size, 14, '7 to 20');
+  assert.strictEqual(Levels.factCount('add', 3), 20);
 });
 
 /* ---------- 6. The single file Haydn pastes into Apps Script ---------- */

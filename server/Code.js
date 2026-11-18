@@ -140,7 +140,7 @@ var ACTIONS = {
     if (seconds < CONFIG.MIN_ATTEMPT_SECONDS) return { saved: false, profile: profileView_(getProfile_(s.id)) };
     return withLock_(function () {
       var now = Date.now(), p = getProfile_(s.id), t = attemptTime_(seconds, correct, wrong);
-      recordAttempt_(p, req.op, level, t, now);
+      recordAttempt_(p, req.op, level, t, now, cutoffs_()[req.op]);
       var upd = {}; upd[s.id] = p;
       saveProfiles_(upd);
       appendAttempts_([[new Date(now), s.id, s.name, 'practice', req.op, level, correct, wrong, round2_(seconds), t, '', '']]);

@@ -17,7 +17,7 @@
 var CONFIG = {
   // Which version of the server code this is. js/config.js has the matching SERVER_VERSION; if they differ,
   // the teacher page shows a warning that Apps Script is running old code. Change BOTH when the server changes.
-  SERVER_VERSION: 12,
+  SERVER_VERSION: 13,
 
   // Number of levels per operation. Must match js/levels.js.
   LEVEL_COUNTS: { mul: 18, div: 18, add: 20, sub: 18 },
@@ -30,7 +30,12 @@ var CONFIG = {
   DUST_PER_WEEK: 0.3,          // seconds of "dust" added for each new week since the level was last played (playing it once clears it all)
   TZ_OFFSET_HOURS: 8,          // Perth (WA has no daylight saving). A new week starts Monday 00:00 local time.
   DEFAULT_CUTOFF: 3.0,         // seconds per correct answer; used until the teacher saves cut-offs
-  MIN_ATTEMPT_SECONDS: 20,     // games shorter than this (e.g. joined a class round very late) are not saved to profiles. Practice is 30 s.
+  MIN_ATTEMPT_SECONDS: 20,     // games shorter than this (e.g. joined a class round very late) are not saved to profiles. Practice is 30 or 60 s.
+  // ---- Single-player (practice) length, per level (v13) ----
+  // First try at a level: SHORT. Once the student has shown fluency at that level (any game, practice or class): always SHORT.
+  // Played but never fluent yet: LONG, until they are fluent. js/student.js uses the length the server works out.
+  PRACTICE_SECONDS_SHORT: 30,
+  PRACTICE_SECONDS_LONG: 60,
   MIN_PASSWORD_LENGTH: 4,      // students choose their own password on first log-in
 
   // ---- Scoring ----
@@ -318,6 +323,7 @@ function onOpen() {
  *     r = seconds-per-correct for the most recent attempts (max CONFIG.RECENT_ATTEMPTS)
  *     n = total attempts ever at this level
  *     t = time of the last attempt (ms) — dust is counted from here
+ *     f = true once the student has shown fluency at this level (fluency time without dust <= cut-off straight after a game) (v13)
  *
  * Rules:
  *   attempt time   = (seconds played + WRONG_PENALTY_SEC (1 s) per wrong answer) / correct answers
@@ -331,6 +337,8 @@ function onOpen() {
  *                    (e.g. L1 1.2 s, L2 1.1 s, nothing else tried, cut-off 3 s -> Level 3).
  *                    Dusty levels pull a student back to revise them, everywhere: My levels, Practice,
  *                    Class levels AND class rounds (v12).
+ *   practice length= 30 s the first time a level is played and whenever fluency has ever been shown at it;
+ *                    60 s if it has been played but fluency has not been shown yet (v13).
  *   class level    = the level played in class rounds = current level (dust included, v12).
  *                    Team balancing uses the student's average at that level WITHOUT dust (expectedTime_).
  */
@@ -360,12 +368,14 @@ function rawTime_(seconds, correct, wrong) {
 function attemptTime_(seconds, correct, wrong) { return round2_(rawTime_(seconds, correct, wrong)); }
 
 function levelStats_(entry, cutoff, now) {
-  if (!entry || !entry.r || !entry.r.length) return { attempts: 0, avg: null, dust: 0, time: null, fluent: false, cleanFluent: false, last: null };
+  if (!entry || !entry.r || !entry.r.length) return { attempts: 0, avg: null, dust: 0, time: null, fluent: false, cleanFluent: false, shown: false, practiceSecs: CONFIG.PRACTICE_SECONDS_SHORT, last: null };
   var r = entry.r.slice(-CONFIG.RECENT_ATTEMPTS);
   var avg = r.reduce(function (a, b) { return a + b; }, 0) / r.length;
   var dust = dustFor_(entry.t, now);
   var time = avg + dust;
   var need = Math.min(CONFIG.MIN_ATTEMPTS_FOR_FLUENCY, CONFIG.RECENT_ATTEMPTS);
+  var clean = r.length >= need && avg <= cutoff;
+  var shown = !!entry.f || clean; // f is saved from v13; older profiles: fluent on their average right now
   return {
     attempts: entry.n || r.length,
     recent: r,
@@ -373,7 +383,9 @@ function levelStats_(entry, cutoff, now) {
     dust: dust,
     time: round2_(time),
     fluent: r.length >= need && time <= cutoff,
-    cleanFluent: r.length >= need && avg <= cutoff, // fluent if dust is ignored
+    cleanFluent: clean, // fluent if dust is ignored
+    shown: shown,       // has ever shown fluency at this level
+    practiceSecs: shown ? CONFIG.PRACTICE_SECONDS_SHORT : CONFIG.PRACTICE_SECONDS_LONG,
     last: entry.t || null
   };
 }
@@ -402,14 +414,19 @@ function profileView_(profile) {
   return out;
 }
 
-/** Adds one attempt to a profile object (mutates it). */
-function recordAttempt_(profile, op, level, time, now) {
+/** Adds one attempt to a profile object (mutates it). With a cut-off, also marks the level once fluency has been shown. */
+function recordAttempt_(profile, op, level, time, now, cutoff) {
   profile[op] = profile[op] || {};
   var e = profile[op][level] || { r: [], n: 0 };
   e.r.push(round2_(time));
   if (e.r.length > CONFIG.RECENT_ATTEMPTS) e.r = e.r.slice(-CONFIG.RECENT_ATTEMPTS);
   e.n = (e.n || 0) + 1;
   e.t = now;
+  if (cutoff !== undefined && !e.f) {
+    var need = Math.min(CONFIG.MIN_ATTEMPTS_FOR_FLUENCY, CONFIG.RECENT_ATTEMPTS);
+    var avg = e.r.reduce(function (a, b) { return a + b; }, 0) / e.r.length;
+    if (e.r.length >= need && avg <= cutoff) e.f = true;
+  }
   profile[op][level] = e;
 }
 
@@ -1047,7 +1064,7 @@ function finishGame_(code) {
       var p = profiles[id] = profiles[id] || {};
       var before = opSummary_(p, g.op, cutoff, now).classLevel;
       if (saved) {
-        recordAttempt_(p, g.op, a.level, t, now);
+        recordAttempt_(p, g.op, a.level, t, now, cutoff);
         updates[id] = p;
         var name = room.players[id] ? room.players[id].name : '';
         // The last-but-one column used to hold points; it is left blank now (kept so older rows still line up).
@@ -1330,7 +1347,7 @@ var ACTIONS = {
     if (seconds < CONFIG.MIN_ATTEMPT_SECONDS) return { saved: false, profile: profileView_(getProfile_(s.id)) };
     return withLock_(function () {
       var now = Date.now(), p = getProfile_(s.id), t = attemptTime_(seconds, correct, wrong);
-      recordAttempt_(p, req.op, level, t, now);
+      recordAttempt_(p, req.op, level, t, now, cutoffs_()[req.op]);
       var upd = {}; upd[s.id] = p;
       saveProfiles_(upd);
       appendAttempts_([[new Date(now), s.id, s.name, 'practice', req.op, level, correct, wrong, round2_(seconds), t, '', '']]);

@@ -14,7 +14,7 @@
  *  - Huge levels (e.g. 3-digit + 3-digit) have too many facts to list, so questions are random
  *    and never repeat within the game.
  *
- * v12: Addition and Subtraction Levels 1-10 are "a + n" / "a − n" (n = level number); the multi-digit
+ * v12: Addition and Subtraction Levels 1-10 are "a + n" / "a − n" (n = level number, a = 1-20, v13: never negative); the multi-digit
  * levels follow from Level 11. Profiles saved with the old numbers are moved over by migrateProfile_ (server/Fluency.js).
  *
  * To change a level: edit it below. If you add/remove levels, also update CONFIG.LEVEL_COUNTS in
@@ -77,17 +77,17 @@
   var RG = true, NRG = false;
 
   function L(emoji, name, tag, desc, src) { return { emoji: emoji, name: name, tag: tag, desc: desc, src: src }; }
-  /** Addition Level n (1-10): a + n, a = 1-10. */
-  function plus(emoji, name, n) { return L(emoji, name, '+' + n, 'a + ' + n + ' (a = 1–10): 1 + ' + n + ' to 10 + ' + n, pairs(1, 10, n, n)); }
-  /** Subtraction Level n (1-10): a − n, answers 1-10, so a = n+1 to n+10. */
-  function minus(emoji, name, n) { return L(emoji, name, '−' + n, 'a − ' + n + ' (answers 1–10): ' + (n + 1) + ' − ' + n + ' to ' + (n + 10) + ' − ' + n, pairs(n + 1, n + 10, n, n)); }
+  /** Addition Level n (1-10): a + n, a = random 1-20. */
+  function plus(emoji, name, n) { return L(emoji, name, '+' + n, 'a + ' + n + ' (a = 1–20): 1 + ' + n + ' to 20 + ' + n, pairs(1, 20, n, n)); }
+  /** Subtraction Level n (1-10): a − n, a = random 1-20 but at least n, so the answer is never negative (n − n = 0 can come up). */
+  function minus(emoji, name, n) { return L(emoji, name, '−' + n, 'a − ' + n + ' (a = ' + n + '–20, no negative answers): ' + n + ' − ' + n + ' to 20 − ' + n, pairs(n, 20, n, n)); }
 
   /* ---------- The levels ---------- */
   var OPS = {
     add: {
       name: 'Addition', symbol: '+', theme: 'Creatures',
       levels: [
-        // Levels 1-10: "a + n" where n is the level number and a is 1-10 (v12).
+        // Levels 1-10: "a + n" where n is the level number and a is a random number 1-20 (v13).
         plus('🐌', 'Snoozy Snail', 1),
         plus('🐨', 'Dozy Koala', 2),
         plus('🐧', 'Waddling Penguin', 3),
@@ -114,7 +114,7 @@
     sub: {
       name: 'Subtraction', symbol: '−', theme: 'Fruit',
       levels: [
-        // Levels 1-10: "a − n" where n is the level number and the answer is 1-10 (so a is n+1 to n+10) (v12).
+        // Levels 1-10: "a − n" where n is the level number and a is a random number 1-20, never below n (no negative answers) (v13).
         minus('🍌', 'Squishy Banana', 1),
         minus('🍋', 'Sour-Face Lemon', 2),
         minus('🍇', 'Rolling Grape', 3),

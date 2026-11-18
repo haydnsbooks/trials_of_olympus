@@ -442,7 +442,7 @@ function finishGame_(code) {
       var p = profiles[id] = profiles[id] || {};
       var before = opSummary_(p, g.op, cutoff, now).classLevel;
       if (saved) {
-        recordAttempt_(p, g.op, a.level, t, now);
+        recordAttempt_(p, g.op, a.level, t, now, cutoff);
         updates[id] = p;
         var name = room.players[id] ? room.players[id].name : '';
         // The last-but-one column used to hold points; it is left blank now (kept so older rows still line up).

@@ -9,7 +9,7 @@
 var CONFIG = {
   // Which version of the server code this is. js/config.js has the matching SERVER_VERSION; if they differ,
   // the teacher page shows a warning that Apps Script is running old code. Change BOTH when the server changes.
-  SERVER_VERSION: 12,
+  SERVER_VERSION: 13,
 
   // Number of levels per operation. Must match js/levels.js.
   LEVEL_COUNTS: { mul: 18, div: 18, add: 20, sub: 18 },
@@ -22,7 +22,12 @@ var CONFIG = {
   DUST_PER_WEEK: 0.3,          // seconds of "dust" added for each new week since the level was last played (playing it once clears it all)
   TZ_OFFSET_HOURS: 8,          // Perth (WA has no daylight saving). A new week starts Monday 00:00 local time.
   DEFAULT_CUTOFF: 3.0,         // seconds per correct answer; used until the teacher saves cut-offs
-  MIN_ATTEMPT_SECONDS: 20,     // games shorter than this (e.g. joined a class round very late) are not saved to profiles. Practice is 30 s.
+  MIN_ATTEMPT_SECONDS: 20,     // games shorter than this (e.g. joined a class round very late) are not saved to profiles. Practice is 30 or 60 s.
+  // ---- Single-player (practice) length, per level (v13) ----
+  // First try at a level: SHORT. Once the student has shown fluency at that level (any game, practice or class): always SHORT.
+  // Played but never fluent yet: LONG, until they are fluent. js/student.js uses the length the server works out.
+  PRACTICE_SECONDS_SHORT: 30,
+  PRACTICE_SECONDS_LONG: 60,
   MIN_PASSWORD_LENGTH: 4,      // students choose their own password on first log-in
 
   // ---- Scoring ----
