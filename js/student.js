@@ -294,7 +294,7 @@
     });
   }
 
-  /* ---------- practice (always 1 minute) ---------- */
+  /* ---------- practice (always C.PRACTICE_SECONDS = 30 s) ---------- */
   function showPracticeOps(fresh) {
     stopPolling();
     render('<div class="card" data-screen="ops">' + backBtn('Menu') + '<h2>Practice</h2><p class="muted">Choose an operation. Every practice round is ' + C.PRACTICE_SECONDS + ' seconds.</p><div class="op-grid">' + opButtons() + '</div></div>');
@@ -313,7 +313,7 @@
   function showPracticeLevels(op) {
     var sum = S.session.profile[op];
     render('<div class="card">' + backBtn() + '<h2>' + opName(op) + '</h2>' +
-      '<p class="muted">Tap a level to start. You\'re fluent at ' + sum.cutoff + ' s or faster per correct answer (average of your last 3 tries).</p>' +
+      '<p class="muted">Tap a level to start. You\'re fluent at ' + sum.cutoff + ' s or faster per correct answer (your last try, or the average of your last 2 tries). Class games count too.</p>' +
       '<div class="level-list">' + sum.levels.map(function (st) {
         var info = Levels.info(op, st.level);
         return '<button class="level-btn' + (st.level === sum.current ? ' current' : '') + '" data-level="' + st.level + '">' +
@@ -366,7 +366,7 @@
       render('<div class="card">' + backBtn('Menu') + '<h2>My levels</h2>' +
         '<div class="tabs">' + Levels.ORDER.map(function (o) { return '<button class="tab' + (o === op ? ' active' : '') + '" data-op="' + o + '">' + Levels.OPS[o].symbol + ' ' + opName(o) + '</button>'; }).join('') + '</div>' +
         '<p class="big-line">' + (sum.mastered ? '🏆 You are fluent at every level!' : 'You are on <b>Level ' + sum.current + ': ' + esc(Levels.title(op, sum.current)) + '</b>') + '</p>' +
-        '<p class="muted">Fluent = ' + sum.cutoff + ' s or faster. Dust 🧹 adds 0.5 s each week you don\'t play a level. Play it to clean it off.</p>' +
+        '<p class="muted">Fluent = ' + sum.cutoff + ' s or faster. Dust 🧹 adds 0.3 s each week you don\'t play a level. Play it once (practice or class game) to clean it all off.</p>' +
         '<div class="table-wrap"><table class="lv-table"><thead><tr><th>Level</th><th>Average</th><th>Dust</th><th>Fluency time</th><th></th></tr></thead><tbody>' +
         sum.levels.map(function (st) {
           return '<tr class="' + (st.level === sum.current && !sum.mastered ? 'current' : '') + '">' +

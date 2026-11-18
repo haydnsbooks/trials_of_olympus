@@ -43,12 +43,14 @@
     render('<div class="teacher-layout">' +
       '<header class="t-head"><h1>⚡ Trials of Olympus</h1><nav>' +
         '<button class="btn small" id="nav-overview">📊 Class levels</button>' +
+        '<button class="btn small" id="nav-levels">📋 Levels</button>' +
         '<button class="btn small" id="nav-passwords">🔑 Passwords</button>' +
         '<button class="btn small" id="nav-settings">⚙️ Cut-offs</button>' +
         '<button class="btn small ghost" id="nav-out">Log out</button></nav></header>' +
       versionWarning() +
       '<main id="room"></main></div>');
     on('#nav-overview', 'click', showOverview);
+    on('#nav-levels', 'click', showLevels);
     on('#nav-passwords', 'click', function () { showPasswords(); });
     on('#nav-settings', 'click', showSettings);
     on('#nav-out', 'click', function () { stop(); store.removeItem(KEY); T.token = null; showLogin(); });
@@ -282,7 +284,7 @@
   function showSettings() {
     stop();
     roomEl().innerHTML = '<div class="card narrow"><h2>⚙️ Fluency cut-offs</h2>' +
-      '<p>A student is <b>fluent</b> at a level when (average of their last 3 attempts + dust) is at or below this many seconds per correct answer. Each attempt\'s time includes ' + (T.rules.wrongPenaltySec || 1) + ' s added for every wrong answer.</p>' +
+      '<p>A student is <b>fluent</b> at a level when (their fluency time + dust) is at or below this many seconds per correct answer. Fluency time = their one attempt if they\'ve played the level once, otherwise the average of their 2 most recent attempts (practice and class games both count). Each attempt\'s time includes ' + (T.rules.wrongPenaltySec || 1) + ' s added for every wrong answer.</p>' +
       Levels.ORDER.map(function (op) {
         return '<label>' + Levels.OPS[op].symbol + ' ' + Levels.OPS[op].name + ' (seconds)<input type="number" step="0.1" min="0.5" max="60" id="c-' + op + '" value="' + T.cutoffs[op] + '"></label>';
       }).join('') +
@@ -294,6 +296,31 @@
     on('#back', 'click', backToGame);
   }
   function backToGame() { if (T.code) refresh(); else drawNoRoom(); }
+
+  /* ---------- level list ---------- */
+  /** Every level of every operation with what it asks (straight from js/levels.js, so it is always up to date). */
+  function showLevels() {
+    stop();
+    var jump = Levels.ORDER.map(function (op) { return '<button class="btn small ghost" data-jump="lv-' + op + '">' + Levels.OPS[op].symbol + ' ' + Levels.OPS[op].name + '</button>'; }).join(' ');
+    roomEl().innerHTML = '<div class="card"><div class="row-between"><h2>📋 Levels</h2><button class="btn ghost" id="back">← Back to game</button></div>' +
+      '<p class="muted">Every level and what it asks. D = digits (e.g. 3D + 2D = a 3-digit number add a 2-digit number). Regrouping = carrying (+) or borrowing (−) in at least one column; no regrouping = none in any column. ' +
+      'Levels with a short list of facts ask every fact once (in random order) before any repeat; bigger levels ask random questions that don\'t repeat within a game.</p>' +
+      '<p>' + jump + '</p>' +
+      Levels.ORDER.map(function (op) {
+        var O = Levels.OPS[op], rows = '';
+        for (var L = 1; L <= Levels.count(op); L++) {
+          var lv = Levels.info(op, L), n = Levels.factCount(op, L), ex = Levels.deck(op, L).next().text;
+          rows += '<tr><td><b>L' + L + '</b></td><td>' + esc(Levels.title(op, L)) + '</td><td>' + esc(lv.desc) + '</td><td>' + esc(ex) + '</td><td>' +
+            (n === null ? 'Random' : n.toLocaleString()) + '</td></tr>';
+        }
+        return '<h3 id="lv-' + op + '">' + O.symbol + ' ' + esc(O.name) + ' <small class="muted">(' + Levels.count(op) + ' levels · cut-off ' + T.cutoffs[op] + ' s)</small></h3>' +
+          '<div class="table-wrap"><table class="lv-table"><thead><tr><th>Level</th><th>Name</th><th>What it asks</th><th>Example</th><th>Different facts</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      }).join('') + '</div>';
+    on('#back', 'click', backToGame);
+    app.querySelectorAll('[data-jump]').forEach(function (b) {
+      b.addEventListener('click', function () { var h = app.querySelector('#' + b.getAttribute('data-jump')); if (h) h.scrollIntoView({ behavior: 'smooth' }); });
+    });
+  }
 
   /* ---------- passwords ---------- */
   /** Pick a student, press Reset: their password is cleared and they make a new one at their next log-in. */
@@ -338,7 +365,7 @@
     roomEl().innerHTML = '<div class="card"><div class="spinner"></div></div>';
     call('classOverview').then(function (r) {
       roomEl().innerHTML = '<div class="card"><div class="row-between"><h2>📊 Class levels</h2><button class="btn ghost" id="back">← Back to game</button></div>' +
-        '<p class="muted">Current level (lowest level not yet fluent) and its fluency time. 🧹 = dust included. Class rounds ignore dust, so a student can play a higher level there.</p>' +
+        '<p class="muted">Current level (lowest level not yet fluent, dust included) and its fluency time. 🧹 = dust included. This is also the level they play in class rounds; teams are balanced on their time without dust.</p>' +
         '<div class="table-wrap"><table class="lv-table overview"><thead><tr><th>Student</th>' +
         Levels.ORDER.map(function (op) { return '<th>' + Levels.OPS[op].symbol + ' ' + Levels.OPS[op].name + '<small>cut-off ' + r.cutoffs[op] + ' s</small></th>'; }).join('') +
         '</tr></thead><tbody>' + r.rows.map(function (row) {

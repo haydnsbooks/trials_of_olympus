@@ -9,19 +9,20 @@
 var CONFIG = {
   // Which version of the server code this is. js/config.js has the matching SERVER_VERSION; if they differ,
   // the teacher page shows a warning that Apps Script is running old code. Change BOTH when the server changes.
-  SERVER_VERSION: 11,
+  SERVER_VERSION: 12,
 
   // Number of levels per operation. Must match js/levels.js.
-  LEVEL_COUNTS: { mul: 18, div: 18, add: 13, sub: 11 },
+  LEVEL_COUNTS: { mul: 18, div: 18, add: 20, sub: 18 },
+  LEVELS_VERSION: 2,           // v12 renumbered + and − levels (new L1-10 = "a + n" / "a - n"); profiles are moved over by migrateProfile_
   OPS: ['add', 'sub', 'mul', 'div'],
 
   // ---- Fluency rules ----
-  RECENT_ATTEMPTS: 3,          // fluency = average of this many most recent attempts at a level
+  RECENT_ATTEMPTS: 2,          // fluency = average of this many most recent attempts at a level (played once = that one attempt)
   MIN_ATTEMPTS_FOR_FLUENCY: 1, // attempts needed at a level before it can count as fluent (<= RECENT_ATTEMPTS). 1 = one fast try is enough
-  DUST_PER_WEEK: 0.5,          // seconds of "dust" added for each new week since the level was last played
+  DUST_PER_WEEK: 0.3,          // seconds of "dust" added for each new week since the level was last played (playing it once clears it all)
   TZ_OFFSET_HOURS: 8,          // Perth (WA has no daylight saving). A new week starts Monday 00:00 local time.
   DEFAULT_CUTOFF: 3.0,         // seconds per correct answer; used until the teacher saves cut-offs
-  MIN_ATTEMPT_SECONDS: 20,     // games shorter than this (e.g. joined very late) are not saved to profiles
+  MIN_ATTEMPT_SECONDS: 20,     // games shorter than this (e.g. joined a class round very late) are not saved to profiles. Practice is 30 s.
   MIN_PASSWORD_LENGTH: 4,      // students choose their own password on first log-in
 
   // ---- Scoring ----
@@ -30,12 +31,13 @@ var CONFIG = {
   WRONG_PENALTY_SEC: 1,
 
   // ---- Team balancing ----
-  // Each student's class level for the chosen operation = their lowest level that is not fluent, ignoring dust.
-  // Their expected seconds-per-correct = their average time at THAT level.
+  // Each student's class level for the chosen operation = their lowest level that is not fluent, INCLUDING dust (v12),
+  // so a level that dust has pushed over the cut-off is played again in class.
+  // Their expected seconds-per-correct = their fluency time at THAT level without dust.
   // Teams are formed so the teams' average expected times are as close as possible (lowest standard deviation).
   // If a student has never played their class level, expected = cut-off + UNKNOWN_EXTRA.
   UNKNOWN_EXTRA: 1.5,
-  BALANCE_ADD_DUST: false,     // false = balance on the real average of recent attempts; true = average + dust (the "fluency time")
+  BALANCE_ADD_DUST: false,     // false = balance on the undusted fluency time; true = fluency time + dust
   BALANCE_RESTARTS: 40,        // how many different starting line-ups the balancer tries (more = more even, slightly slower)
 
   // ---- Trophy cabinet ----

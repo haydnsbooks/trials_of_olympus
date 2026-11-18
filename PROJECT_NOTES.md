@@ -102,13 +102,28 @@
 - Teacher page: when a different operation is picked, the first Teams option changes to "Re-balanced (N teams)" and the hint says so. The rule is on the server, so a cached teacher page gets it too.
 - Tests: new checks for re-balancing on a new operation. Not checked on a real iPad.
 
+## v12 changes (18 Nov 2026, Haydn's requests) — SERVER_VERSION 12
+- **Dust = +0.3 s per week** (`DUST_PER_WEEK`, was 0.5). Playing a level once (practice or class) clears all its dust (dust counts from the last attempt; unchanged).
+- **Class rounds include dusty levels.** Class level = current level (lowest not fluent, dust included); `classLevel` in `opSummary_` is now just a copy of `current`. Undoes v10. Team balancing still uses the time **without** dust at that level (`expectedTime_`, `BALANCE_ADD_DUST: false`).
+- **Every game counts** for fluency: practice and class rounds both `recordAttempt_` (already the case; checked) and both clear dust. Games under `MIN_ATTEMPT_SECONDS` (20 s) still aren't saved (e.g. joining a class round very late).
+- **Penalty in single player:** already applied (`practiceSubmit` uses `attemptTime_` with wrong answers); now covered by tests.
+- **Fluency time:** played once → that attempt; twice or more → average of the 2 most recent (`RECENT_ATTEMPTS: 2`, was 3). Older 3-attempt profiles just use their last 2.
+- **Practice = 30 s** (`PRACTICE_SECONDS` in `js/config.js`).
+- **New + and − Levels 1–10:** Addition L n = a + n, a = 1–10. Subtraction L n = a − n, answers 1–10 (a = n+1 to n+10). Tags "+7" / "−7" shown before the name. Then the multi-digit progression from Level 11 (Addition: old L4 2D+2D regrouping → L11 … 5D+5D L20; Subtraction: old L4 2D−2D no regrouping → L11 … 3D−3D L18). Old Addition L1–3 (1D+1D, 2D+1D) and Subtraction L1–3 (1D−1D, 2D−1D) removed. `LEVEL_COUNTS` add 20, sub 18.
+  - **Profiles migrated** on read by `migrateProfile_` (`server/Fluency.js`, called in `getProfiles_`): old + / − L4+ move up 7; old L1–3 data dropped (still in the Attempts sheet). Profiles get `lv: 2` so it only happens once; saved with the student's next game. Attempts sheet rows from before 18 Nov use the OLD level numbers.
+  - Every student starts + and − at the new Level 1 (never-tried levels count as not fluent).
+- **Teacher 📋 Levels page** (`showLevels` in `js/teacher.js`): every level of every operation with name, what it asks, a random example and how many different facts (or "Random"). Built from `js/levels.js`, so it stays up to date. `Levels.factCount` added.
+- Text updated: cut-offs page, Class levels page, My levels (dust 0.3 s), Practice level list.
+- Tests: 144 checks. Teacher Levels page checked in Chrome (demo mode). Not checked on a real iPad.
+- To confirm with Haydn: the a ranges (+: 1–10; −: answers 1–10), the new level names, and dropping the old L1–3 data.
+
 ## Assumptions to confirm with Haydn
 - Winner = lowest team time per correct answer (as specified), including 1 s per wrong answer (v9).
 - v9: wrong answers after the last correct answer still add 1 s; the penalty also applies to practice and fluency levels; re-roll is 5% platinum / 95% lost with no "stays gold" outcome; no weekly choice → best trophy (platinum, then newest) is kept; undecided trophies can still be decided in the cabinet until the week locks.
-- Current level = lowest non-fluent level, so dust on an earlier level pulls the student back to it.
+- Current level = lowest non-fluent level, so dust on an earlier level pulls the student back to it (in class rounds too since v12).
 - Practice results count towards the profile.
 - Default cut-off 3 s for every operation until changed.
-- Single-digit numbers use 1–9 (not 0) in Addition L1–2 and Subtraction L1.
+- v12: + and − Levels 1–10 use a = 1–10 (addition) and answers 1–10 (subtraction); 0 is never used.
 - Team-count choices go up to 8 (`TEAM_COUNTS`); presence timeout 30 s.
 - Trophies (v6): a winning-team member whose result never arrived (e.g. flat iPad) gets no trophy; the week locks at the very start of Sunday (00:00), so trophies won on a Sunday belong to the week ending the following Sunday.
 - v7: balancing ignores dust (`BALANCE_ADD_DUST`); "Same teams" keeps sizes as they are after people leave (e.g. 4, 4, 2), only newcomers are evened out; a full tie (same time and points) shares 1st place and every tied team gets the trophy.

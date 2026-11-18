@@ -24,9 +24,12 @@ const inR = (x, lo, hi) => x >= lo && x <= hi;
 
 const mulTables = [2, 10, 5, 3, 4, 11, 6, 7, 8, 9, 12];
 const big = [[13, 15], [16, 20], [21, 25], [26, 30], [31, 35], [36, 40]];
-const addSpec = [[1,9,1,9,false],[1,9,1,9,true],[10,99,1,9,false],[10,99,10,99,true],[100,999,1,9,true],[100,999,10,99,true],[100,999,100,999,true],
+// Levels 1-10 (v12): a + n with a = 1-10, b = n (no regrouping rule: null). a − n with answer 1-10.
+const smallAdd = Array.from({ length: 10 }, (_, i) => [1, 10, i + 1, i + 1, null]);
+const smallSub = Array.from({ length: 10 }, (_, i) => [i + 2, i + 11, i + 1, i + 1, null]);
+const addSpec = [...smallAdd, [10,99,10,99,true],[100,999,1,9,true],[100,999,10,99,true],[100,999,100,999,true],
   [1000,9999,10,99,true],[1000,9999,100,999,true],[1000,9999,1000,9999,true],[10000,99999,100,999,true],[10000,99999,1000,9999,true],[10000,99999,10000,99999,true]];
-const subSpec = [[1,9,1,9,false],[10,99,1,9,false],[10,99,1,9,true],[10,99,10,99,false],[10,99,10,99,true],[100,999,1,9,false],[100,999,1,9,true],
+const subSpec = [...smallSub, [10,99,10,99,false],[10,99,10,99,true],[100,999,1,9,false],[100,999,1,9,true],
   [100,999,10,99,false],[100,999,10,99,true],[100,999,100,999,false],[100,999,100,999,true]];
 
 function checkLevel(op, level, q) {
@@ -50,18 +53,18 @@ function checkLevel(op, level, q) {
     const s = addSpec[level - 1];
     assert.strictEqual(q.answer, a + b, q.text);
     assert(inR(a, s[0], s[1]) && inR(b, s[2], s[3]), 'range ' + q.text);
-    assert.strictEqual(carryCols(a, b), s[4], 'regrouping rule ' + q.text);
+    if (s[4] !== null) assert.strictEqual(carryCols(a, b), s[4], 'regrouping rule ' + q.text);
   } else if (op === 'sub') {
     const s = subSpec[level - 1];
     assert.strictEqual(q.answer, a - b, q.text);
     assert(a >= b, 'negative ' + q.text);
     assert(inR(a, s[0], s[1]) && inR(b, s[2], s[3]), 'range ' + q.text);
-    assert.strictEqual(borrowCols(a, b), s[4], 'regrouping rule ' + q.text);
+    if (s[4] !== null) assert.strictEqual(borrowCols(a, b), s[4], 'regrouping rule ' + q.text);
   }
 }
 
 console.log('\nQuestion generators (2,000 questions per level)');
-const expectedCounts = { mul: 18, div: 18, add: 13, sub: 11 };
+const expectedCounts = { mul: 18, div: 18, add: 20, sub: 18 };
 for (const op of Levels.ORDER) {
   test(op + ': has ' + expectedCounts[op] + ' levels', () => assert.strictEqual(Levels.count(op), expectedCounts[op]));
   for (let level = 1; level <= Levels.count(op); level++) {
@@ -87,10 +90,13 @@ test('times-table deck: first 12 questions are all 12 different facts', () => {
     assert.strictEqual(keys.size, 12);
   }
 });
-test('names: ×/÷ show the table, +/− show only the name', () => {
+test('names: ×/÷ show the table, +/− L1-10 show the number, multi-digit +/− show only the name', () => {
   assert.strictEqual(Levels.name('mul', 5), '4× Bumpy Bus');
   assert.strictEqual(Levels.name('div', 1), '÷2 Space Potato');
-  assert.strictEqual(Levels.name('add', 1), 'Snoozy Snail');
+  assert.strictEqual(Levels.name('add', 7), '+7 Nutty Squirrel');
+  assert.strictEqual(Levels.name('sub', 7), '−7 Bouncing Blueberry');
+  assert.strictEqual(Levels.name('add', 11), 'Burping Frog');
+  assert.strictEqual(Levels.name('sub', 11), 'Hairy Kiwi');
   assert.deepStrictEqual(Levels.ORDER, ['add', 'sub', 'mul', 'div']);
 });
 
@@ -364,16 +370,31 @@ test('weeks start Monday 00:00 Perth time', () => {
   assert.strictEqual(wk(perth(2026, 10, 25, 23)), wk(perth(2026, 10, 19, 0)), 'Sun 25 Oct and Mon 19 Oct same week');
   assert.strictEqual(wk(perth(2026, 10, 26, 0)), wk(perth(2026, 10, 25, 23)) + 1, 'Mon 26 Oct is a new week');
 });
-test('dust: 0.5 s per new week since last played', () => {
-  const dust = F('dustFor_');
+test('dust: 0.3 s per new week since last played', () => {
+  const dust = F('dustFor_'), r = x => Math.round(x * 100) / 100;
   assert.strictEqual(dust(perth(2026, 10, 22, 10), perth(2026, 10, 25, 10)), 0);
-  assert.strictEqual(dust(perth(2026, 10, 22, 10), perth(2026, 10, 26, 8)), 0.5);
-  assert.strictEqual(dust(perth(2026, 10, 1, 10), perth(2026, 10, 22, 10)), 1.5);
+  assert.strictEqual(r(dust(perth(2026, 10, 22, 10), perth(2026, 10, 26, 8))), 0.3);
+  assert.strictEqual(r(dust(perth(2026, 10, 1, 10), perth(2026, 10, 22, 10))), 0.9);
 });
-test('your example: 3.2 s with 3 weeks of dust = 4.7 s, no longer fluent at 4 s cut-off', () => {
+test('3 weeks of dust: last two 3.2 + 3.3 = 3.25 avg + 0.9 = 4.15 s, no longer fluent at 4 s cut-off', () => {
   const stats = F('levelStats_')({ r: [3.1, 3.2, 3.3], n: 5, t: perth(2026, 10, 1, 10) }, 4, perth(2026, 10, 22, 10));
-  assert.strictEqual(stats.time, 4.7);
+  assert.strictEqual(stats.avg, 3.25, 'old 3-attempt profiles: only the 2 most recent count');
+  assert.strictEqual(stats.time, 4.15);
   assert.strictEqual(stats.fluent, false);
+});
+test('fluency time: played once = that attempt; played twice or more = average of the 2 most recent', () => {
+  const now = Date.now(), rec = F('recordAttempt_'), st = p => F('levelStats_')(p.add[3], 3, now);
+  const p = {};
+  rec(p, 'add', 3, 2.4, now); assert.strictEqual(st(p).time, 2.4);
+  rec(p, 'add', 3, 3.0, now); assert.strictEqual(st(p).time, 2.7);
+  rec(p, 'add', 3, 5.0, now); assert.strictEqual(st(p).time, 4);
+  assert.strictEqual(p.add[3].n, 3);
+});
+test('playing a dusty level once removes all its dust', () => {
+  const now = perth(2026, 10, 22, 10), p = { add: { 1: { r: [2, 2], n: 2, t: perth(2026, 9, 1, 10) } } };
+  assert(F('levelStats_')(p.add[1], 3, now).dust > 0);
+  F('recordAttempt_')(p, 'add', 1, 2, now);
+  assert.strictEqual(F('levelStats_')(p.add[1], 3, now).dust, 0);
 });
 test('dusty lower level becomes the current level again', () => {
   const now = perth(2026, 10, 22, 10);
@@ -388,25 +409,25 @@ test('team balancing uses the real average at the class level (dust not added un
   assert.strictEqual(sum.classLevel, 1);
   assert.strictEqual(F('expectedTime_')(sum), 4.5);
   F('CONFIG').BALANCE_ADD_DUST = true;
-  assert.strictEqual(F('expectedTime_')(sum), 6);
+  assert.strictEqual(F('expectedTime_')(sum), 5.4);
   F('CONFIG').BALANCE_ADD_DUST = false;
 });
-test('class level ignores dust: dusty fluent levels do not pull a student back in class rounds', () => {
-  const now = perth(2026, 10, 22, 10), old = perth(2026, 10, 1, 10); // 3 weeks of dust = +1.5 s
-  const prof = { mul: { 1: { r: [3, 3, 3], n: 3, t: old }, 2: { r: [3.5, 3.5, 3.5], n: 3, t: old }, 3: { r: [5, 5, 5], n: 3, t: now } } };
+test('class level INCLUDES dust (v12): a level dust pushes over the cut-off is played in class; teams use the undusted time', () => {
+  const now = perth(2026, 10, 22, 10), old = perth(2026, 10, 1, 10); // 3 weeks of dust = +0.9 s
+  const prof = { mul: { 1: { r: [3.5, 3.5], n: 2, t: old }, 2: { r: [3, 3], n: 2, t: old }, 3: { r: [5, 5], n: 2, t: now } } };
   const sum = F('opSummary_')(prof, 'mul', 4, now);
-  assert.strictEqual(sum.current, 1, 'My levels still counts dust');
-  assert.strictEqual(sum.classLevel, 3, 'L1 and L2 average under the 4 s cut-off, so class level = 3');
-  assert.strictEqual(F('expectedTime_')(sum), 5, 'time comes from the class level, with no dust');
+  assert.strictEqual(sum.current, 1, '3.5 + 0.9 = 4.4 s is over the 4 s cut-off');
+  assert.strictEqual(sum.classLevel, 1, 'class rounds use the same level');
+  assert.strictEqual(F('expectedTime_')(sum), 3.5, 'balancing uses the time without dust');
   const all = {}; for (let L = 1; L <= 18; L++) all[L] = { r: [2], n: 1, t: old };
-  const top = F('opSummary_')({ mul: all }, 'mul', 3, now);
-  assert.strictEqual(top.classLevel, 18); assert.strictEqual(top.classMastered, true);
-  assert.strictEqual(top.mastered, false, 'dust still un-masters levels in My levels');
+  const top = F('opSummary_')({ mul: all }, 'mul', 2.5, now);
+  assert.strictEqual(top.classLevel, 1); assert.strictEqual(top.classMastered, false);
+  assert.strictEqual(F('opSummary_')({ mul: all }, 'mul', 3, now).classMastered, true, '2 + 0.9 = 2.9 s is fluent at 3 s');
 });
-test('fluency uses only the 3 most recent attempts', () => {
+test('fluency uses only the 2 most recent attempts', () => {
   const p = {}; const rec = F('recordAttempt_');
   [9, 9, 2, 2, 2].forEach(t => rec(p, 'add', 1, t, Date.now()));
-  assert.strictEqual(JSON.stringify(p.add[1].r), '[2,2,2]');
+  assert.strictEqual(JSON.stringify(p.add[1].r), '[2,2]');
   assert.strictEqual(p.add[1].n, 5);
 });
 
@@ -760,22 +781,45 @@ test('no points anywhere in what the server sends', () => {
   assert.strictEqual(r.rules.wrongPenaltySec, 1);
 });
 
-test('class round: dusty student gets the no-dust level, its time balances the teams, and level-up matches', () => {
-  const now = Date.now(), old = now - 21 * 86400000, id = ids[10]; // 3 weeks ago: 1.5 s of dust
+test('class round: dusty level is played, its undusted time balances the teams, the round clears the dust and counts', () => {
+  const now = Date.now(), old = now - 21 * 86400000, id = ids[10]; // 3 weeks ago: 0.9 s of dust
   const p = F('getProfile_')(id);
-  p.div = { 1: { r: [3, 3, 3], n: 3, t: old }, 2: { r: [5, 5, 5], n: 3, t: old } };
+  p.div = { 1: { r: [3.5, 3.5], n: 2, t: old }, 2: { r: [5, 5], n: 2, t: old } };
   F('saveProfiles_')({ [id]: p });
   assert.strictEqual(F('opSummary_')(p, 'div', 4, now).current, 1, 'test set-up: dust makes level 1 not fluent');
   const room = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'div', seconds: 60, teams: 3 })).room;
   const m = [].concat(...room.game.teams.map(t => t.members)).find(x => x.name === nameOf[id]);
-  assert.strictEqual(m.level, 2, 'should play the lowest level not fluent, ignoring dust');
-  assert.strictEqual(m.exp, 5, 'expected time should be the level 2 average with no dust');
+  assert.strictEqual(m.level, 1, 'should play level 1: 3.5 s + 0.9 s dust is over the 4 s cut-off');
+  assert.strictEqual(m.exp, 3.5, 'expected time should be the level 1 time with no dust');
   assert.strictEqual(m.est, false);
-  assert.strictEqual(ok(call({ action: 'roomState', token: tokens[id] })).room.game.level, 2);
-  submitAll(() => ({ correct: 30 })); // 2 s each: fluent at level 2
+  assert.strictEqual(ok(call({ action: 'roomState', token: tokens[id] })).room.game.level, 1);
+  submitAll(() => ({ correct: 30 })); // 2 s each
   ok(call({ action: 'finishGame', teacherToken: teacher, code }));
   const me = ok(call({ action: 'roomState', token: tokens[id] })).room.results.me;
-  assert.strictEqual(me.level, 2); assert.strictEqual(me.levelUp, true); assert.strictEqual(me.newLevel, 3);
+  assert.strictEqual(me.level, 1); assert.strictEqual(me.levelUp, true); assert.strictEqual(me.newLevel, 2);
+  const st = ok(call({ action: 'profile', token: tokens[id] })).profile.div.levels[0];
+  assert.strictEqual(st.dust, 0, 'class round cleared the dust');
+  assert.strictEqual(st.avg, 2.75, 'class round counts: average of 3.5 and 2');
+});
+
+test('old profiles move to the new + and − level numbers (once only)', () => {
+  const p = { add: { 1: { r: [2], n: 1, t: 1 }, 3: { r: [3], n: 1, t: 1 }, 4: { r: [4], n: 1, t: 1 }, 13: { r: [9], n: 1, t: 1 } },
+              sub: { 2: { r: [2], n: 1, t: 1 }, 4: { r: [5], n: 1, t: 1 }, 11: { r: [6], n: 1, t: 1 } },
+              mul: { 1: { r: [1], n: 1, t: 1 } }, cab: { wk: 1, items: [] } };
+  F('migrateProfile_')(p);
+  assert.deepStrictEqual(Object.keys(p.add), ['11', '20']); assert.strictEqual(p.add[11].r[0], 4); assert.strictEqual(p.add[20].r[0], 9);
+  assert.deepStrictEqual(Object.keys(p.sub), ['11', '18']); assert.strictEqual(p.sub[11].r[0], 5);
+  assert.strictEqual(p.mul[1].r[0], 1); assert(p.cab); assert.strictEqual(p.lv, 2);
+  F('migrateProfile_')(p);
+  assert.deepStrictEqual(Object.keys(p.add), ['11', '20'], 'running it again changes nothing');
+});
+test('migration happens when a saved profile is read', () => {
+  const id = ids[11];
+  F('saveProfiles_')({ [id]: { add: { 4: { r: [2], n: 1, t: Date.now() } } } });
+  F('clearCache')();
+  const v = ok(call({ action: 'profile', token: tokens[id] })).profile;
+  assert.strictEqual(v.add.levels[10].avg, 2, 'old Addition L4 is now L11');
+  assert.strictEqual(v.add.levels[3].avg, null);
 });
 
 /* ---------- 6. The single file Haydn pastes into Apps Script ---------- */

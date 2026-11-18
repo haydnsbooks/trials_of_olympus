@@ -8,7 +8,7 @@ window.APP_CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbw6v67ApYAtR9wygDcr2B3mqfZXnwQHWU8BVvD5TqagO6yoDPQ8GzzE1mPBXCmPjIUMxA/exec',
 
   // Must match SERVER_VERSION in server/Config.js. If Apps Script is running older code, the teacher page says so.
-  SERVER_VERSION: 11,
+  SERVER_VERSION: 12,
 
   // ---- Polling (how often screens ask the server "anything new?") ----
   // Each poll is a cache read on the server (no sheet access). Nothing is polled while a game is being played.
@@ -20,7 +20,7 @@ window.APP_CONFIG = {
   POLL_JITTER_MS: 1000,     // random extra delay so 25 iPads don't all ask at the same instant
 
   // ---- Choices shown on screen ----
-  PRACTICE_SECONDS: 60,     // every practice round is this long
+  PRACTICE_SECONDS: 30,     // every practice (single player) round is this long
   GAME_SECONDS: [60, 90, 120, 180, 300],
   TEAM_COUNTS: [0, 2, 3, 4, 5, 6, 7, 8],   // number of teams the teacher can pick; 0 = individual play
 

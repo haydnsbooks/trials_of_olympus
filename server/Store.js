@@ -132,6 +132,7 @@ function getProfiles_(ids) {
     var all = loadAllProfiles_();
     ids.forEach(function (id) { if (!out[id]) out[id] = all[id] || {}; });
   }
+  ids.forEach(function (id) { migrateProfile_(out[id]); }); // older level numbering -> current (saved with the next write)
   return out;
 }
 function getProfile_(id) { return getProfiles_([id])[id]; }

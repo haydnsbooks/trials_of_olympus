@@ -14,6 +14,9 @@
  *  - Huge levels (e.g. 3-digit + 3-digit) have too many facts to list, so questions are random
  *    and never repeat within the game.
  *
+ * v12: Addition and Subtraction Levels 1-10 are "a + n" / "a − n" (n = level number); the multi-digit
+ * levels follow from Level 11. Profiles saved with the old numbers are moved over by migrateProfile_ (server/Fluency.js).
+ *
  * To change a level: edit it below. If you add/remove levels, also update CONFIG.LEVEL_COUNTS in
  * server/Config.js and the spec in tests/run-tests.js, then run `node tests/run-tests.js`.
  * Add new levels at the END of a list — profiles store progress by level number.
@@ -74,15 +77,28 @@
   var RG = true, NRG = false;
 
   function L(emoji, name, tag, desc, src) { return { emoji: emoji, name: name, tag: tag, desc: desc, src: src }; }
+  /** Addition Level n (1-10): a + n, a = 1-10. */
+  function plus(emoji, name, n) { return L(emoji, name, '+' + n, 'a + ' + n + ' (a = 1–10): 1 + ' + n + ' to 10 + ' + n, pairs(1, 10, n, n)); }
+  /** Subtraction Level n (1-10): a − n, answers 1-10, so a = n+1 to n+10. */
+  function minus(emoji, name, n) { return L(emoji, name, '−' + n, 'a − ' + n + ' (answers 1–10): ' + (n + 1) + ' − ' + n + ' to ' + (n + 10) + ' − ' + n, pairs(n + 1, n + 10, n, n)); }
 
   /* ---------- The levels ---------- */
   var OPS = {
     add: {
       name: 'Addition', symbol: '+', theme: 'Creatures',
       levels: [
-        L('🐌', 'Snoozy Snail', '', '1D + 1D, no regrouping', pairs(1, 9, 1, 9, carry(NRG))),
-        L('🐨', 'Dozy Koala', '', '1D + 1D, regrouping (sum 10+)', pairs(1, 9, 1, 9, carry(RG))),
-        L('🐧', 'Waddling Penguin', '', '2D + 1D, no regrouping', pairs(10, 99, 1, 9, carry(NRG))),
+        // Levels 1-10: "a + n" where n is the level number and a is 1-10 (v12).
+        plus('🐌', 'Snoozy Snail', 1),
+        plus('🐨', 'Dozy Koala', 2),
+        plus('🐧', 'Waddling Penguin', 3),
+        plus('🐢', 'Tumbling Turtle', 4),
+        plus('🐹', 'Cheeky Hamster', 5),
+        plus('🦔', 'Prickly Hedgehog', 6),
+        plus('🐿️', 'Nutty Squirrel', 7),
+        plus('🦦', 'Splashy Otter', 8),
+        plus('🐒', 'Swinging Monkey', 9),
+        plus('🦉', 'Hooting Owl', 10),
+        // Level 11 on: the multi-digit progression.
         L('🐸', 'Burping Frog', '', '2D + 2D, regrouping', pairs(10, 99, 10, 99, carry(RG))),
         L('🦘', 'Boxing Kangaroo', '', '3D + 1D, regrouping', pairs(100, 999, 1, 9, carry(RG))),
         L('🦩', 'Disco Flamingo', '', '3D + 2D, regrouping', pairs(100, 999, 10, 99, carry(RG))),
@@ -98,9 +114,18 @@
     sub: {
       name: 'Subtraction', symbol: '−', theme: 'Fruit',
       levels: [
-        L('🍌', 'Squishy Banana', '', '1D − 1D', pairs(1, 9, 1, 9, borrow(NRG))),
-        L('🍋', 'Sour-Face Lemon', '', '2D − 1D, no regrouping', pairs(10, 99, 1, 9, borrow(NRG))),
-        L('🍇', 'Rolling Grape', '', '2D − 1D, regrouping', pairs(10, 99, 1, 9, borrow(RG))),
+        // Levels 1-10: "a − n" where n is the level number and the answer is 1-10 (so a is n+1 to n+10) (v12).
+        minus('🍌', 'Squishy Banana', 1),
+        minus('🍋', 'Sour-Face Lemon', 2),
+        minus('🍇', 'Rolling Grape', 3),
+        minus('🍓', 'Blushing Strawberry', 4),
+        minus('🍐', 'Wobbly Pear', 5),
+        minus('🍊', 'Zesty Orange', 6),
+        minus('🫐', 'Bouncing Blueberry', 7),
+        minus('🍑', 'Fuzzy Peach', 8),
+        minus('🥑', 'Sneaky Avocado', 9),
+        minus('🍈', 'Marching Melon', 10),
+        // Level 11 on: the multi-digit progression.
         L('🥝', 'Hairy Kiwi', '', '2D − 2D, no regrouping', pairs(10, 99, 10, 99, borrow(NRG))),
         L('🍍', 'Spiky Pineapple', '', '2D − 2D, regrouping', pairs(10, 99, 10, 99, borrow(RG))),
         L('🥥', 'Coconut Cannonball', '', '3D − 1D, no regrouping', pairs(100, 999, 1, 9, borrow(NRG))),
@@ -195,13 +220,15 @@
     ORDER: ['add', 'sub', 'mul', 'div'],
     count: function (op) { return OPS[op].levels.length; },
     info: function (op, level) { return OPS[op].levels[level - 1]; },
-    /** "4× Bumpy Bus" for ×/÷, "Snoozy Snail" for +/−. */
+    /** "4× Bumpy Bus", "+7 Nutty Squirrel", "Burping Frog" (levels with no tag show just the name). */
     name: function (op, level) { var lv = OPS[op].levels[level - 1]; return (lv.tag ? lv.tag + ' ' : '') + lv.name; },
     /** With emoji: "🚌 4× Bumpy Bus" */
     title: function (op, level) { return OPS[op].levels[level - 1].emoji + ' ' + Levels.name(op, level); },
     /** "Level 5: 🚌 4× Bumpy Bus" */
     label: function (op, level) { return 'Level ' + level + ': ' + Levels.title(op, level); },
     deck: function (op, level) { return new Deck(op, level); },
+    /** How many different facts a level has, or null if it is too big to list (questions are then random). */
+    factCount: function (op, level) { var src = OPS[op].levels[level - 1].src; return src.all ? src.all().length : null; },
     _hasCarry: hasCarry, _hasBorrow: hasBorrow
   };
 
