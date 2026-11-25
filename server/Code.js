@@ -15,7 +15,7 @@ function doPost(e) {
 /** Open the /exec URL in a browser to see which version of the code Google is running. */
 function doGet() {
   return json_({ ok: true, message: 'Fluency game API is running.', serverVersion: CONFIG.SERVER_VERSION,
-                 playAgainInstalled: typeof playAgain_ === 'function', now: Date.now() });
+                 playAgainInstalled: typeof playAgain_ === 'function', trophyRoomInstalled: typeof trophyRoom_ === 'function', now: Date.now() });
 }
 function json_(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
@@ -51,21 +51,23 @@ function startSession_(s) {
 }
 
 function rules_() {
-  return { serverVersion: CONFIG.SERVER_VERSION, wrongPenaltySec: CONFIG.WRONG_PENALTY_SEC,
-           reroll: { platinum: CONFIG.REROLL_PLATINUM_CHANCE, lose: CONFIG.REROLL_LOSE_CHANCE },
+  return { serverVersion: CONFIG.SERVER_VERSION, wrongPenaltySec: CONFIG.WRONG_PENALTY_SEC, dustPerWeek: CONFIG.DUST_PER_WEEK,
+           reroll: rerollOdds_(),
            minAttemptSeconds: CONFIG.MIN_ATTEMPT_SECONDS, submitGraceMs: CONFIG.SUBMIT_GRACE_MS, levelCounts: CONFIG.LEVEL_COUNTS };
 }
 
-function keeperAction_(req) {
+/** Changes one student's cabinet with fn(profile, id, now), saves it and returns the cabinet view. */
+function cabinetChange_(req, fn) {
   var s = authStudent_(req);
   return withLock_(function () {
     var now = Date.now(), p = getProfile_(s.id);
-    setKeeper_(p, String(req.id || ''), now);
+    fn(p, String(req.id || ''), now);
     var upd = {}; upd[s.id] = p;
     saveProfiles_(upd);
     return { cabinet: cabinetView_(p, now) };
   });
 }
+function keeperAction_(req) { return cabinetChange_(req, setKeeper_); }
 
 var ACTIONS = {
   /* ----- Student ----- */
@@ -103,18 +105,18 @@ var ACTIONS = {
     return { profile: profileView_(getProfile_(s.id)), rules: rules_() };
   },
 
-  /** The student's trophy cabinet: this week's trophies (one will be kept) and the locked ones from past weeks. */
+  /** The student's trophy cabinet: this week's trophies (one will be kept), the locked ones from past weeks, and the showcase. */
   cabinet: function (req) {
     var s = authStudent_(req);
     return withLock_(function () {
       var now = Date.now(), p = getProfile_(s.id), before = JSON.stringify(p.cab || null);
       var view = cabinetView_(p, now);
-      if (JSON.stringify(p.cab) !== before) { var upd = {}; upd[s.id] = p; saveProfiles_(upd); } // a week was just locked in
+      if (JSON.stringify(p.cab) !== before) { var upd = {}; upd[s.id] = p; saveProfiles_(upd); } // a week was just locked in (or old data converted)
       return { cabinet: view };
     });
   },
 
-  /** An undecided trophy: req.choice 'keep' (put it in the cabinet as it is) or 'reroll' (platinum / lost / stays gold). */
+  /** An undecided trophy: req.choice 'keep' (put it in the cabinet as it is) or 'reroll' (one step up the ladder, or lost). */
   trophyDecision: function (req) {
     var s = authStudent_(req);
     return withLock_(function () {
@@ -129,6 +131,15 @@ var ACTIONS = {
   /** Picks which of this week's trophies will be locked into the cabinet. (setFavourite = old name, for cached pages.) */
   setKeeper: function (req) { return keeperAction_(req); },
   setFavourite: function (req) { return keeperAction_(req); },
+
+  /** Picks which locked-in trophy stands on the student's plinth in the Trophy room. */
+  setShowcase: function (req) { return cabinetChange_(req, setShowcase_); },
+
+  /** Every student's showcase trophy (names + trophies only). */
+  trophyRoom: function (req) {
+    var s = authStudent_(req);
+    return { room: trophyRoom_(s.id, Date.now()) };
+  },
 
   practiceSubmit: function (req) {
     var s = authStudent_(req);

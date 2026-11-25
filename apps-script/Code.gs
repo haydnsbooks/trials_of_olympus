@@ -17,7 +17,7 @@
 var CONFIG = {
   // Which version of the server code this is. js/config.js has the matching SERVER_VERSION; if they differ,
   // the teacher page shows a warning that Apps Script is running old code. Change BOTH when the server changes.
-  SERVER_VERSION: 13,
+  SERVER_VERSION: 14,
 
   // Number of levels per operation. Must match js/levels.js.
   LEVEL_COUNTS: { mul: 18, div: 18, add: 20, sub: 18 },
@@ -27,7 +27,7 @@ var CONFIG = {
   // ---- Fluency rules ----
   RECENT_ATTEMPTS: 2,          // fluency = average of this many most recent attempts at a level (played once = that one attempt)
   MIN_ATTEMPTS_FOR_FLUENCY: 1, // attempts needed at a level before it can count as fluent (<= RECENT_ATTEMPTS). 1 = one fast try is enough
-  DUST_PER_WEEK: 0.3,          // seconds of "dust" added for each new week since the level was last played (playing it once clears it all)
+  DUST_PER_WEEK: 0.2,          // seconds of "dust" added for each new week since the level was last played (playing it once clears it all)
   TZ_OFFSET_HOURS: 8,          // Perth (WA has no daylight saving). A new week starts Monday 00:00 local time.
   DEFAULT_CUTOFF: 3.0,         // seconds per correct answer; used until the teacher saves cut-offs
   MIN_ATTEMPT_SECONDS: 20,     // games shorter than this (e.g. joined a class round very late) are not saved to profiles. Practice is 30 or 60 s.
@@ -54,12 +54,14 @@ var CONFIG = {
   BALANCE_RESTARTS: 40,        // how many different starting line-ups the balancer tries (more = more even, slightly slower)
 
   // ---- Trophy cabinet ----
-  // Every player on the winning team of a class round gets the same trophy (picked at random from this list).
+  // Every player on the winning team of a class round gets the same BASIC trophy (picked at random from this list).
   // Straight after winning they choose: put it in the cabinet, or re-roll it (see REROLL_*).
   // Each week they keep ONE trophy: at Sunday 00:00 Perth time the one they chose is locked into their cabinet
   // for good and the rest of that week's trophies are cleared. If they didn't choose, their best one is kept
-  // (platinum first, then the newest).
-  // The emoji are shown gold (or platinum) on screen by CSS filters in css/style.css, so any emoji works here.
+  // (highest tier first: ebony, pearl, platinum, basic; then the newest).
+  // Each student picks one locked-in trophy as their SHOWCASE trophy, shown on their plinth in the Trophy room
+  // (if they haven't picked, their best locked-in trophy is shown).
+  // The emoji are coloured on screen by CSS filters in css/style.css, so any emoji works here.
   TROPHIES: [
     ['🏆', 'Golden Cup'], ['👑', 'Crown of Olympus'], ['🦉', 'Owl of Athena'], ['⚡', 'Thunderbolt of Zeus'],
     ['🔱', 'Trident of Poseidon'], ['🏺', 'Golden Amphora'], ['🐎', 'Golden Pegasus'], ['🦁', 'Nemean Lion'],
@@ -70,8 +72,17 @@ var CONFIG = {
     ['🥇', 'Olympic Gold'], ['🌟', 'Star of Olympus'], ['🐬', 'Dolphin of Apollo'], ['🗿', 'Head of the Titan']
   ],
   TROPHY_SHELF_MAX: 60,        // most trophies held in one week before the weekly keep (oldest drop off first)
-  REROLL_PLATINUM_CHANCE: 0.05, // re-roll: chance the trophy becomes platinum
-  REROLL_LOSE_CHANCE: 0.95,     // re-roll: chance the trophy is lost. Anything left over (1 - both) = stays gold and can be re-rolled again
+
+  // Re-roll ladder. A trophy can only be re-rolled one step up at a time:
+  //   basic -> platinum (20%), platinum -> pearl (10%), pearl -> ebony (5%). Ebony is the top and can't be re-rolled.
+  // A re-roll that doesn't come up = the trophy is LOST. After each successful step the student chooses again:
+  // keep it, or risk it for the next step. The odds are the same for every student (they are not shown on screen;
+  // students are told more fluent levels help, and see a "re-roll power" bar of their fluent levels — Haydn's design).
+  REROLL_LADDER: [
+    { from: 'basic', to: 'plat',  name: 'Platinum', chance: 0.20 },
+    { from: 'plat',  to: 'pearl', name: 'Pearl',    chance: 0.10 },
+    { from: 'pearl', to: 'ebony', name: 'Ebony',    chance: 0.05 }
+  ],
 
   // ---- Timing / traffic ----
   START_DELAY_MS: 8000,        // countdown before a class game starts. Must be longer than the student lobby poll (js/config.js)
@@ -330,7 +341,7 @@ function onOpen() {
  *                    Every saved game counts: practice AND class rounds (penalty included in both).
  *   fluency time   = played once: that attempt's time. Played twice or more: average of the 2 most recent attempts.
  *                    Plus dust.
- *   dust           = 0.3 s for every new week (Monday) since the level was last played.
+ *   dust           = DUST_PER_WEEK (0.2 s) for every new week (Monday) since the level was last played.
  *                    Playing the level once (practice or class) clears all of it.
  *   fluent         = at least MIN_ATTEMPTS_FOR_FLUENCY attempts (currently 1) AND fluency time (with dust) <= cut-off
  *   current level  = the LOWEST level that is not fluent, counting levels never tried as not fluent
@@ -352,7 +363,8 @@ function weekIndex_(ms) {
 }
 function dustFor_(lastMs, nowMs) {
   if (!lastMs) return 0;
-  return Math.max(0, weekIndex_(nowMs) - weekIndex_(lastMs)) * CONFIG.DUST_PER_WEEK;
+  var weeks = Math.max(0, weekIndex_(nowMs) - weekIndex_(lastMs));
+  return Math.round(weeks * CONFIG.DUST_PER_WEEK * 1000) / 1000; // e.g. 3 × 0.2 = 0.6 exactly (not 0.6000000000000001)
 }
 
 function cutoffs_() {
@@ -472,22 +484,28 @@ function validOpLevel_(op, level) {
 
 // ===================== Trophies =====================
 /**
- * TROPHY CABINET
+ * TROPHY CABINET + TROPHY ROOM
  * ---------------------------------------------------------------
  * Each student's cabinet is stored inside their profile JSON (Profiles sheet), so no new sheet is needed:
- *   profile.cab = { wk, items: [trophy, ...newest first], keep: id | null, locked: [trophy + {wk}, ...newest first] }
+ *   profile.cab = { wk, items: [trophy, ...newest first], keep: id | null,
+ *                   locked: [trophy + {wk}, ...newest first], show: id | null }
  *   trophy      = { id, e: '🦉', n: 'Owl of Athena', op: 'mul', team: 'Azure Krakens', t: 1729500000000,
- *                   plat: true (platinum) | absent, open: true (not decided yet: keep or re-roll) | absent }
+ *                   tier: 'plat' | 'pearl' | 'ebony' | absent (= basic), open: true (not decided yet) | absent }
+ *   (Trophies from v9/v10 stored platinum as plat: true. They are read as tier 'plat' and converted.)
  *
  * Rules:
- *  - Every player on the winning team of a class round (who sent in a result) gets the same trophy. It goes
- *    into this week's trophies straight away, "open" (undecided).
- *  - Undecided trophy: the student either puts it in the cabinet as it is (decides it), or re-rolls it:
- *    REROLL_PLATINUM_CHANCE (5%) it becomes platinum, REROLL_LOSE_CHANCE (95%) it is lost, otherwise it stays
- *    gold and undecided. They can choose on the win screen or later in the cabinet. Platinum can't be re-rolled.
+ *  - Every player on the winning team of a class round (who sent in a result) gets the same BASIC trophy.
+ *    It goes into this week's trophies straight away, "open" (undecided).
+ *  - Undecided trophy: the student either puts it in the cabinet as it is (decides it), or re-rolls it ONE step
+ *    up the ladder (CONFIG.REROLL_LADDER): basic -> platinum 20%, platinum -> pearl 10%, pearl -> ebony 5%.
+ *    Miss = the trophy is lost. Hit = it changes tier and stays undecided, so they can keep it or risk it again.
+ *    Ebony is the top: it is decided automatically. The odds are the same for every student and are not sent
+ *    to the app (students only see a "re-roll power" bar made from their fluent levels — Haydn's design).
  *  - One trophy per week is kept: the student taps the one to keep. At the start of the next trophy week
  *    (Sunday 00:00 Perth) that trophy is LOCKED into the cabinet for good and the week's other trophies are cleared.
- *    If they didn't choose, their best trophy is kept: platinum first, then the newest.
+ *    If they didn't choose, their best trophy is kept: highest tier first (ebony, pearl, platinum, basic), then newest.
+ *  - Showcase: the student picks one locked-in trophy to stand on their plinth in the Trophy room.
+ *    If they haven't picked one, their best locked-in trophy is shown (highest tier, then newest).
  *  - Locking happens whenever the cabinet is next read or changed, so no timed trigger is needed.
  *  - Older cabinets (v6/v7) had a "favourite": it is locked in (or, if it was won this week, kept as this week's choice).
  */
@@ -508,15 +526,42 @@ function trophyWeekStarts_(wk) { return trophyWeekEnds_(wk) - 7 * DAY_MS_; }
 
 function copyTrophy_(t) { var c = {}; Object.keys(t).forEach(function (k) { c[k] = t[k]; }); return c; }
 
-/** The trophy that will be locked in this week: the chosen one, else platinum first, then newest. */
+/* ---------- Tiers ---------- */
+
+/** 'basic', 'plat', 'pearl' or 'ebony'. */
+function tierOf_(t) { return t.tier || (t.plat ? 'plat' : 'basic'); }
+/** Old platinum trophies (plat: true) -> tier: 'plat'. Mutates. */
+function normaliseTier_(t) { if (t.plat) { if (!t.tier) t.tier = 'plat'; delete t.plat; } }
+/** 0 = basic; then 1, 2, 3 ... going up the re-roll ladder (platinum, pearl, ebony). */
+function tierRank_(id) {
+  if (id === 'basic') return 0;
+  for (var i = 0; i < CONFIG.REROLL_LADDER.length; i++) if (CONFIG.REROLL_LADDER[i].to === id) return i + 1;
+  return 1; // a tier that has since been removed from CONFIG still beats basic
+}
+/** The ladder step a trophy can be re-rolled with, or null (top tier). */
+function nextStep_(t) {
+  var tier = tierOf_(t);
+  for (var i = 0; i < CONFIG.REROLL_LADDER.length; i++) if (CONFIG.REROLL_LADDER[i].from === tier) return CONFIG.REROLL_LADDER[i];
+  return null;
+}
+/** The best trophy in a list: highest tier first, then the newest. */
+function bestOf_(list) {
+  var best = null;
+  (list || []).forEach(function (t) {
+    if (!best) { best = t; return; }
+    var a = tierRank_(tierOf_(t)), b = tierRank_(tierOf_(best));
+    if (a > b || (a === b && t.t > best.t)) best = t;
+  });
+  return best;
+}
+
+/* ---------- Weekly keep ---------- */
+
+/** The trophy that will be locked in this week: the chosen one, else the best one. */
 function weekKeeper_(cab) {
   var items = cab.items || [], i;
   if (cab.keep) for (i = 0; i < items.length; i++) if (items[i].id === cab.keep) return items[i];
-  var best = null;
-  items.forEach(function (t) {
-    if (!best || (!!t.plat !== !!best.plat ? !!t.plat : t.t > best.t)) best = t;
-  });
-  return best;
+  return bestOf_(items);
 }
 
 /** Locks the week's keeper into the cabinet and clears the week. */
@@ -534,10 +579,11 @@ function lockWeek_(cab) {
 /** The student's cabinet, after locking any finished week. Mutates the profile. */
 function cabinet_(profile, now) {
   var wk = trophyWeek_(now);
-  var cab = profile.cab || { wk: wk, items: [], keep: null, locked: [] };
+  var cab = profile.cab || { wk: wk, items: [], keep: null, locked: [], show: null };
   if (!cab.items) cab.items = [];
   if (!cab.locked) cab.locked = [];
   if (cab.keep === undefined) cab.keep = null;
+  if (cab.show === undefined) cab.show = null;
   if (cab.wk === undefined) cab.wk = wk;
   if (cab.fav) { // v6/v7 favourite
     var fav = cab.fav; delete cab.fav;
@@ -545,6 +591,8 @@ function cabinet_(profile, now) {
     if (favWk === cab.wk) { cab.items.unshift(fav); cab.items.sort(function (a, b) { return b.t - a.t; }); cab.keep = fav.id; }
     else { var lf = copyTrophy_(fav); lf.wk = favWk; cab.locked.unshift(lf); cab.locked.sort(function (a, b) { return b.wk - a.wk; }); }
   }
+  cab.items.forEach(normaliseTier_);
+  cab.locked.forEach(normaliseTier_);
   if (cab.wk !== wk) { lockWeek_(cab); cab.wk = wk; }
   profile.cab = cab;
   return cab;
@@ -558,7 +606,7 @@ function pickTrophy_(notEmoji) {
   return { e: t[0], n: t[1] };
 }
 
-/** Adds a won trophy to this week's trophies, undecided (mutates the profile). Returns the stored trophy. */
+/** Adds a won (basic) trophy to this week's trophies, undecided (mutates the profile). Returns the stored trophy. */
 function awardTrophy_(profile, trophy, op, teamName, now) {
   var cab = cabinet_(profile, now);
   var item = { id: now.toString(36) + Math.random().toString(36).slice(2, 7), e: trophy.e, n: trophy.n, op: op, team: teamName, t: now, open: true };
@@ -570,52 +618,99 @@ function awardTrophy_(profile, trophy, op, teamName, now) {
   return item;
 }
 
-function findItem_(cab, id) {
-  for (var i = 0; i < cab.items.length; i++) if (cab.items[i].id === id) return i;
+function findIn_(list, id) {
+  for (var i = 0; i < list.length; i++) if (list[i].id === id) return i;
   return -1;
 }
 
 /**
  * The student decides what to do with an undecided trophy.
- * choice 'keep'   -> it goes in the cabinet as it is.          outcome 'kept'
- * choice 'reroll' -> platinum (outcome 'platinum'), lost (outcome 'lost'), or stays gold and undecided ('gold').
+ * choice 'keep'   -> it goes in the cabinet as it is.                                  outcome 'kept'
+ * choice 'reroll' -> one step up the ladder. Hit: outcome = the new tier ('plat' / 'pearl' / 'ebony'); the trophy
+ *                    stays undecided unless it is now the top tier. Miss: outcome 'lost' (removed).
  * rnd: optional random number 0..1 (tests); the server always uses Math.random.
  */
 function decideTrophy_(profile, id, choice, now, rnd) {
   var cab = cabinet_(profile, now);
-  var i = findItem_(cab, id);
+  var i = findIn_(cab.items, id);
   if (i < 0) throw new Error('That trophy isn\'t in your cabinet any more.');
   var t = cab.items[i];
   if (!t.open) throw new Error('You\'ve already decided about this trophy.');
   if (choice === 'keep') { delete t.open; return { outcome: 'kept', trophy: t }; }
   if (choice !== 'reroll') throw new Error('Unknown choice');
+  var step = nextStep_(t);
+  if (!step) { delete t.open; throw new Error('This trophy is already the best it can be.'); }
   var r = rnd === undefined ? Math.random() : rnd;
-  if (r < CONFIG.REROLL_PLATINUM_CHANCE) { t.plat = true; delete t.open; return { outcome: 'platinum', trophy: t }; }
-  if (r < CONFIG.REROLL_PLATINUM_CHANCE + CONFIG.REROLL_LOSE_CHANCE) {
-    cab.items.splice(i, 1);
-    if (cab.keep === id) cab.keep = null;
-    return { outcome: 'lost', trophy: null };
+  if (r < step.chance) {
+    t.tier = step.to;
+    if (!nextStep_(t)) delete t.open; // top of the ladder: nothing left to re-roll
+    return { outcome: step.to, trophy: t };
   }
-  return { outcome: 'gold', trophy: t };
+  cab.items.splice(i, 1);
+  if (cab.keep === id) cab.keep = null;
+  return { outcome: 'lost', trophy: null };
 }
 
 /** The student picks which of this week's trophies to keep. */
 function setKeeper_(profile, id, now) {
   var cab = cabinet_(profile, now);
-  if (findItem_(cab, id) < 0) throw new Error('That trophy isn\'t in your cabinet any more.');
+  if (findIn_(cab.items, id) < 0) throw new Error('That trophy isn\'t in your cabinet any more.');
   cab.keep = id;
   return cab;
 }
 
-/** What the student app displays. */
+/* ---------- Showcase + trophy room ---------- */
+
+/** The locked-in trophy on the student's plinth: the one they picked, else their best locked-in one. */
+function showcase_(cab) {
+  var i = cab.show ? findIn_(cab.locked, cab.show) : -1;
+  return i >= 0 ? cab.locked[i] : bestOf_(cab.locked);
+}
+
+/** The student picks one of their locked-in trophies as their showcase trophy. */
+function setShowcase_(profile, id, now) {
+  var cab = cabinet_(profile, now);
+  if (findIn_(cab.locked, id) < 0) throw new Error('Only trophies locked into your cabinet can go in the Trophy room.');
+  cab.show = id;
+  return cab;
+}
+
+/** What the student app displays in the cabinet. */
 function cabinetView_(profile, now) {
   var cab = cabinet_(profile, now);
-  var k = weekKeeper_(cab);
+  var k = weekKeeper_(cab), s = showcase_(cab);
   return {
     week: { items: cab.items, keeper: k ? k.id : null, chosen: !!cab.keep, locksAt: trophyWeekEnds_(cab.wk) },
     locked: cab.locked.map(function (t) { var c = copyTrophy_(t); c.from = trophyWeekStarts_(t.wk); return c; }),
-    odds: { platinum: CONFIG.REROLL_PLATINUM_CHANCE, lose: CONFIG.REROLL_LOSE_CHANCE }
+    showcase: { id: s ? s.id : null, chosen: !!(s && cab.show === s.id) },
+    odds: rerollOdds_()
   };
+}
+
+/**
+ * Trophy room: every active student who has a showcase trophy, sorted by name.
+ * Read-only: works on copies of the profiles, so it never writes to the sheet (a finished week is locked the
+ * same way when that student's own cabinet is next opened).
+ * Only names and showcase trophies are sent; never levels, times or anyone's other trophies.
+ */
+function trophyRoom_(meId, now) {
+  var students = getStudents_().filter(function (s) { return s.active; });
+  var profiles = getProfiles_(students.map(function (s) { return s.id; }));
+  var plinths = [];
+  students.forEach(function (s) {
+    var copy = JSON.parse(JSON.stringify(profiles[s.id] || {}));
+    var t = showcase_(cabinet_(copy, now));
+    if (!t) return;
+    plinths.push({ name: s.name, me: s.id === meId, e: t.e, n: t.n, tier: tierOf_(t) === 'basic' ? null : tierOf_(t),
+                   op: t.op, from: trophyWeekStarts_(t.wk) });
+  });
+  plinths.sort(function (a, b) { return a.name.localeCompare(b.name); });
+  return { plinths: plinths, students: students.length };
+}
+
+/** The ladder as sent to the student app: which tier comes next and its name. No chances (they aren't shown). */
+function rerollOdds_() {
+  return { steps: CONFIG.REROLL_LADDER.map(function (st) { return { from: st.from, to: st.to, name: st.name }; }) };
 }
 
 
@@ -1222,7 +1317,7 @@ function doPost(e) {
 /** Open the /exec URL in a browser to see which version of the code Google is running. */
 function doGet() {
   return json_({ ok: true, message: 'Fluency game API is running.', serverVersion: CONFIG.SERVER_VERSION,
-                 playAgainInstalled: typeof playAgain_ === 'function', now: Date.now() });
+                 playAgainInstalled: typeof playAgain_ === 'function', trophyRoomInstalled: typeof trophyRoom_ === 'function', now: Date.now() });
 }
 function json_(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
@@ -1258,21 +1353,23 @@ function startSession_(s) {
 }
 
 function rules_() {
-  return { serverVersion: CONFIG.SERVER_VERSION, wrongPenaltySec: CONFIG.WRONG_PENALTY_SEC,
-           reroll: { platinum: CONFIG.REROLL_PLATINUM_CHANCE, lose: CONFIG.REROLL_LOSE_CHANCE },
+  return { serverVersion: CONFIG.SERVER_VERSION, wrongPenaltySec: CONFIG.WRONG_PENALTY_SEC, dustPerWeek: CONFIG.DUST_PER_WEEK,
+           reroll: rerollOdds_(),
            minAttemptSeconds: CONFIG.MIN_ATTEMPT_SECONDS, submitGraceMs: CONFIG.SUBMIT_GRACE_MS, levelCounts: CONFIG.LEVEL_COUNTS };
 }
 
-function keeperAction_(req) {
+/** Changes one student's cabinet with fn(profile, id, now), saves it and returns the cabinet view. */
+function cabinetChange_(req, fn) {
   var s = authStudent_(req);
   return withLock_(function () {
     var now = Date.now(), p = getProfile_(s.id);
-    setKeeper_(p, String(req.id || ''), now);
+    fn(p, String(req.id || ''), now);
     var upd = {}; upd[s.id] = p;
     saveProfiles_(upd);
     return { cabinet: cabinetView_(p, now) };
   });
 }
+function keeperAction_(req) { return cabinetChange_(req, setKeeper_); }
 
 var ACTIONS = {
   /* ----- Student ----- */
@@ -1310,18 +1407,18 @@ var ACTIONS = {
     return { profile: profileView_(getProfile_(s.id)), rules: rules_() };
   },
 
-  /** The student's trophy cabinet: this week's trophies (one will be kept) and the locked ones from past weeks. */
+  /** The student's trophy cabinet: this week's trophies (one will be kept), the locked ones from past weeks, and the showcase. */
   cabinet: function (req) {
     var s = authStudent_(req);
     return withLock_(function () {
       var now = Date.now(), p = getProfile_(s.id), before = JSON.stringify(p.cab || null);
       var view = cabinetView_(p, now);
-      if (JSON.stringify(p.cab) !== before) { var upd = {}; upd[s.id] = p; saveProfiles_(upd); } // a week was just locked in
+      if (JSON.stringify(p.cab) !== before) { var upd = {}; upd[s.id] = p; saveProfiles_(upd); } // a week was just locked in (or old data converted)
       return { cabinet: view };
     });
   },
 
-  /** An undecided trophy: req.choice 'keep' (put it in the cabinet as it is) or 'reroll' (platinum / lost / stays gold). */
+  /** An undecided trophy: req.choice 'keep' (put it in the cabinet as it is) or 'reroll' (one step up the ladder, or lost). */
   trophyDecision: function (req) {
     var s = authStudent_(req);
     return withLock_(function () {
@@ -1336,6 +1433,15 @@ var ACTIONS = {
   /** Picks which of this week's trophies will be locked into the cabinet. (setFavourite = old name, for cached pages.) */
   setKeeper: function (req) { return keeperAction_(req); },
   setFavourite: function (req) { return keeperAction_(req); },
+
+  /** Picks which locked-in trophy stands on the student's plinth in the Trophy room. */
+  setShowcase: function (req) { return cabinetChange_(req, setShowcase_); },
+
+  /** Every student's showcase trophy (names + trophies only). */
+  trophyRoom: function (req) {
+    var s = authStudent_(req);
+    return { room: trophyRoom_(s.id, Date.now()) };
+  },
 
   practiceSubmit: function (req) {
     var s = authStudent_(req);

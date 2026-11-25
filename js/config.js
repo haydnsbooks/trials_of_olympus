@@ -8,7 +8,7 @@ window.APP_CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbw6v67ApYAtR9wygDcr2B3mqfZXnwQHWU8BVvD5TqagO6yoDPQ8GzzE1mPBXCmPjIUMxA/exec',
 
   // Must match SERVER_VERSION in server/Config.js. If Apps Script is running older code, the teacher page says so.
-  SERVER_VERSION: 13,
+  SERVER_VERSION: 14,
 
   // ---- Polling (how often screens ask the server "anything new?") ----
   // Each poll is a cache read on the server (no sheet access). Nothing is polled while a game is being played.
@@ -23,6 +23,12 @@ window.APP_CONFIG = {
   PRACTICE_SECONDS: 30,     // practice length if the server doesn't say (it sends 30 or 60 per level: see PRACTICE_SECONDS_* in server/Config.js)
   GAME_SECONDS: [60, 90, 120, 180, 300],
   TEAM_COUNTS: [0, 2, 3, 4, 5, 6, 7, 8],   // number of teams the teacher can pick; 0 = individual play
+
+  // ---- Fluency meter + re-roll power bar ----
+  // Shown under the fluency meter (menu, trophy cabinet) and the re-roll power bar (win screen, cabinet) — Haydn's wording requests.
+  // NOTE: the re-roll odds do NOT depend on fluency (see REROLL_LADDER in server/Config.js); these lines are motivational only.
+  FLUENCY_REROLL_NOTE: 'More fluent levels = more re-roll power! Keep the dust 🧹 off your levels.',
+  POWER_NOTE: 'Your re-roll power comes from your fluent levels. The more levels you\'re fluent in, the more likely a re-roll will work. Keep the dust 🧹 off!',
 
   // ---- Feel ----
   WRONG_PAUSE_MS: 900,      // how long the correct answer shows after a wrong answer

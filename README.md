@@ -1,6 +1,6 @@
 # ⚡ Trials of Olympus
 
-A class multiplayer maths fluency game. Every student answers questions at **their own level**, teams are balanced from past results, and each game builds a per-student profile of fluency levels (with weekly "dust"). Winning teams earn golden trophies for each player's **trophy cabinet**.
+A class multiplayer maths fluency game. Every student answers questions at **their own level**, teams are balanced from past results, and each game builds a per-student profile of fluency levels (with weekly "dust"). Winning teams earn trophies for each player's **trophy cabinet**, which can be re-rolled up a ladder to platinum, pearl and ebony (or lost); each student's showcase trophy stands on a plinth in the class **Trophy room**.
 
 - **Front end:** plain HTML/JS on **GitHub Pages** (free). Works on the teacher PC and student iPads (Safari).
 - **Back end:** **Google Apps Script web app** bound to a **Google Sheet** (free).
@@ -51,7 +51,8 @@ A class multiplayer maths fluency game. Every student answers questions at **the
 | Attempt time | (seconds played + 1 s per wrong answer) ÷ correct answers — same rule in practice and class games. **Every** saved game (practice or class) is recorded for that level | `attemptTime_` in `server/Fluency.js` |
 | Fluency time | played once: that attempt's time. Played twice or more: average of the **2 most recent attempts** (penalties included). Plus dust | `RECENT_ATTEMPTS` |
 | Fluent | ≥ 1 attempt **and** fluency time ≤ cut-off | `MIN_ATTEMPTS_FOR_FLUENCY`, cut-offs on teacher page |
-| Dust | +0.3 s for every new week (Monday 00:00 Perth time) since that level was last played; playing the level once (practice or class game) clears all of it | `DUST_PER_WEEK`, `TZ_OFFSET_HOURS` |
+| Dust | **+0.2 s** for every new week (Monday 00:00 Perth time) since that level was last played; playing the level once (practice or class game) clears all of it | `DUST_PER_WEEK`, `TZ_OFFSET_HOURS` |
+| Fluency meter + re-roll power | menu and trophy cabinet show "Fluent levels **N / 74 · P%**": levels fluent right now across all four operations, **dust included** (a dusty level stops counting). Above every Re-roll button (win screen and cabinet) the same % is shown as a **🎲 Re-roll power** bar, with text saying more fluent levels make a re-roll more likely to work. **No chances are shown anywhere, and the real odds do not depend on fluency** (Haydn's design) | `fluencyMeter`, `powerBar` in `js/student.js`; wording `FLUENCY_REROLL_NOTE`, `POWER_NOTE` in `js/config.js` |
 | Current level | **lowest** level that is not fluent (dust included) — so a dusty earlier level pulls a student back to revise it (My levels, Practice, Class levels **and class rounds**) | `opSummary_` in `server/Fluency.js` |
 | Class level | the level played in class rounds = the current level, **including** levels that dust has pushed over the cut-off (since v12) | `classLevel` in `opSummary_` |
 | Team balancing | each student's expected time = their fluency time **without dust** at **their own** class level for the chosen operation (cut-off + 1.5 s if never played). Teams are formed so the teams' average times have the **lowest possible standard deviation** (40 starting line-ups, then best swaps/moves). Sizes differ by at most 1 | `formTeams_` in `server/Rooms.js`, `BALANCE_*` in `server/Config.js` |
@@ -61,14 +62,16 @@ A class multiplayer maths fluency game. Every student answers questions at **the
 | Levels | + and − Levels 1–10 are "a + n" / "a − n" where n = the level number (a = a random number 1–20; for − never smaller than n, so no negative answers). From Level 11 the multi-digit levels (2D ± 2D and up). Full list with parameters: **📋 Levels** on the teacher page | `js/levels.js` |
 | Question order | small levels (e.g. a times table) are a shuffled deck: every fact once before any repeat, never the same fact twice in a row, wrong answers come back later in the deck. Huge levels are random with no repeats in a game | `Levels.deck` in `js/levels.js` |
 | Leaving | ✕ Leave on every game and countdown screen. Leaving a class round mid-game removes the student from that round so the teacher isn't kept waiting. Leaving after a round has been played shows a pop-up asking whether all the rounds are finished | `leaveRoom` in `server/Code.js` |
-| Trophies | every player on the winning team of a class round who sent in a result gets the same trophy (random from a Greek-myth list, never the same as the previous round's). Teams tied for 1st all get it. Practice gives no trophies | `TROPHIES` in `server/Config.js` |
-| Keep or re-roll | straight after winning (or later in the cabinet) each winner chooses **Put it in my cabinet** or **🎲 Re-roll**: 5% it turns **platinum**, 95% it's lost. Platinum can't be re-rolled | `REROLL_PLATINUM_CHANCE`, `REROLL_LOSE_CHANCE` |
-| Trophy cabinet | **🏆 Trophy cabinet** on the student menu. Top: this week's trophies — tap one → **⭐ Keep this one this week**. At **Sunday 00:00 Perth time** the ⭐ trophy is **locked in for good** (bottom shelves, labelled with its week) and the rest are cleared. No choice made → best one is kept (platinum first, then newest). Up to 60 trophies a week | `server/Trophies.js`, `TROPHY_SHELF_MAX` |
-| Gold / platinum trophies | any emoji is drawn gold (or platinum) by a CSS filter, so the list can use any emoji | `.trophy`, `.trophy.plat` in `css/style.css` |
+| Trophies | every player on the winning team of a class round who sent in a result gets the same **basic** (gold) trophy (random from a Greek-myth list, never the same as the previous round's). Teams tied for 1st all get it. Practice gives no trophies | `TROPHIES` in `server/Config.js` |
+| Keep or re-roll | straight after winning (or later in the cabinet) each winner chooses **Put it in my cabinet** or **🎲 Re-roll for <next tier>**. One step at a time: basic → **Platinum** (20%) → **Pearl** (10%) → **Ebony** (5%). A miss at any step = the trophy is **lost**. After each success they choose again (keep, or risk it for the next tier). Ebony is the top. Same odds for everyone; the chances are not sent to the app | `REROLL_LADDER` in `server/Config.js` |
+| Trophy cabinet | **🏆 Trophy cabinet** on the student menu. Top: this week's trophies — tap one → **⭐ Keep this one this week**. At **Sunday 00:00 Perth time** the ⭐ trophy is **locked in for good** (bottom shelves, labelled with its week) and the rest are cleared. No choice made → best one is kept (highest tier first: ebony, pearl, platinum, basic; then newest). Up to 60 trophies a week | `server/Trophies.js`, `TROPHY_SHELF_MAX` |
+| Showcase trophy | in the cabinet, tap a **locked-in** trophy → **🏛️ Make this my showcase trophy**. Not chosen → their best locked-in trophy is shown | `setShowcase_` in `server/Trophies.js` |
+| Trophy room | **🏛️ Trophy room** on the student menu (and a link from the cabinet): every student who has a locked-in trophy has a marble plinth with their showcase trophy and **their name** (sorted by name, the student's own plinth lit up and centred). Tap-and-drag anywhere (or mouse drag, arrow keys, sideways trackpad scroll) to move along the hall; it glides when let go and **loops forever** both ways. Students with no locked-in trophy yet don't have a plinth. Only names and showcase trophies are sent, never levels or times | `trophyRoom_` in `server/Trophies.js`, `mountHall` in `js/student.js` |
+| Trophy colours | any emoji is drawn gold, platinum, pearl (white) or ebony (black) by CSS filters, so the list can use any emoji | `.trophy`, `.trophy.plat`, `.trophy.pearl`, `.trophy.ebony` in `css/style.css` |
 
 ## 4. Sheet traffic (why this won't overload Google)
 - Rooms, logins and lobby polling live in Apps Script **CacheService** (memory), not the sheet. Students/Settings/Profiles are cached too.
-- The sheet is written **once per class round**, **once per practice game** and **once each time a student picks a favourite trophy**. Trophies live inside each student's profile, so they add no extra sheet writes to a class round.
+- The sheet is written **once per class round**, **once per practice game** and **once each time a student keeps, re-rolls, chooses a weekly trophy or chooses a showcase trophy**. Opening the Trophy room never writes to the sheet. Trophies live inside each student's profile, so they add no extra sheet writes to a class round.
 - Lobby polling: every 3 s + random 0–1 s per iPad (cache read only). Nothing polls during play.
 - Google's published limits relevant here: **30 simultaneous executions per user** (the web app runs as you, so all students' requests share this), **6 min per execution**, and CacheService entries are capped at **100 KB per value** and **6 hours** maximum life ([quotas](https://developers.google.com/apps-script/guides/services/quotas), [Cache](https://developers.google.com/apps-script/reference/cache/cache)). I haven't measured how long these requests take on Google's servers, so do a trial with the whole class; if you ever see "too many simultaneous invocations" errors, raise `LOBBY_POLL_MS` in `js/config.js`.
 - Rooms expire 6 hours after the last change (CacheService maximum).
@@ -77,14 +80,14 @@ A class multiplayer maths fluency game. Every student answers questions at **the
 ```
 index.html            Student app page (loads the js files below)
 teacher.html          Teacher app page
-css/style.css         All styling: Mount Olympus theme (colours + fonts at the top), trophy cabinet, Play again panel at the bottom
+css/style.css         All styling: Mount Olympus theme (colours + fonts at the top), trophy cabinet, Play again panel, trophy tiers, fluency meter, re-roll power bar, trophy room at the bottom
 css/pad.css           Number pad + Flip button
-js/config.js          API URL, polling speeds, time/team choices        ← browser settings
+js/config.js          API URL, polling speeds, time/team choices, fluency/power wording  ← browser settings
 js/levels.js          Level list, themed names + emoji, question decks  ← add/edit/rename levels here
 js/api.js             The only code that talks to the server (+ demo mode)
 js/game.js            Timed question screen + number pad + countdown
-js/celebrate.js       Results/podium, places, extra decimals for near-ties, "You won a trophy!", confetti (shared)
-js/student.js         Student screens: login, menu, practice, my levels, trophy cabinet, class game
+js/celebrate.js       Results/podium, places, extra decimals for near-ties, "You won a trophy!", trophy tiers + keep/re-roll buttons, confetti (shared)
+js/student.js         Student screens: login, menu, practice, my levels, trophy cabinet, trophy room, class game
 js/teacher.js         Teacher screens: room, start, results + Play again, cut-offs, class levels, passwords
 js/demo/mock-gas.js   Fake Google services for demo + tests (NOT for Apps Script)
 apps-script/Code.gs   ALL server code in one file — this is what you paste into Apps Script (built from server/)
@@ -92,13 +95,15 @@ server/Config.js      Server rules: wrong-answer penalty, re-roll odds, fluency,
 server/Code.js        API router: list of actions
 server/Store.js       All Sheet/Cache reads & writes, setup()
 server/Fluency.js     Levels, dust, fluency, profiles
-server/Trophies.js    Trophy cabinet: awarding, favourite, Sunday clear-out
+server/Trophies.js    Trophy cabinet: awarding, re-roll ladder, weekly keep, Sunday lock-in, showcase, trophy room
 server/Rooms.js       Rooms, team balancing, Play again, results ranking, trophy for the winning team
 tests/run-tests.js    `node tests/run-tests.js` — checks 2,000 questions per level against the spec + simulated class games, Play again, placings + trophies
 ```
 **Adding a level:** add it in `js/levels.js`, update `LEVEL_COUNTS` in `server/Config.js` (and the spec arrays in `tests/run-tests.js`), run the tests, redeploy. Add new levels at the **end** of a list — profiles store levels by number, so inserting in the middle shifts students' history.
 
 **Adding or renaming a trophy:** edit `TROPHIES` in `server/Config.js` (`['emoji', 'Name']`), rebuild Code.gs, redeploy. Trophies already in cabinets keep their old emoji and name.
+
+**Changing the re-roll odds:** edit the `chance` of each step in `REROLL_LADDER` in `server/Config.js` (a miss always loses the trophy). The steps are in order; the last tier is the most precious.
 
 **Adding a server action:** add it to `ACTIONS` in `server/Code.js`, call it with `API.call('name', {...})`.
 

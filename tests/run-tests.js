@@ -163,6 +163,7 @@ test('practice never gives trophies; empty cabinet to start', () => {
   const c = ok(call({ action: 'cabinet', token: tokens[ids[0]] })).cabinet;
   assert.strictEqual(c.week.items.length, 0);
   assert.strictEqual(c.locked.length, 0);
+  assert.strictEqual(c.showcase.id, null);
 });
 test('teacher can change cut-offs', () => {
   const c = ok(call({ action: 'saveSettings', teacherToken: teacher, cutoffs: { mul: 4, div: 4, add: 5, sub: 5 } })).cutoffs;
@@ -371,17 +372,20 @@ test('weeks start Monday 00:00 Perth time', () => {
   assert.strictEqual(wk(perth(2026, 10, 25, 23)), wk(perth(2026, 10, 19, 0)), 'Sun 25 Oct and Mon 19 Oct same week');
   assert.strictEqual(wk(perth(2026, 10, 26, 0)), wk(perth(2026, 10, 25, 23)) + 1, 'Mon 26 Oct is a new week');
 });
-test('dust: 0.3 s per new week since last played', () => {
-  const dust = F('dustFor_'), r = x => Math.round(x * 100) / 100;
+test('dust: 0.2 s per new week since last played (exact, no rounding errors)', () => {
+  const dust = F('dustFor_');
+  assert.strictEqual(F('CONFIG').DUST_PER_WEEK, 0.2);
   assert.strictEqual(dust(perth(2026, 10, 22, 10), perth(2026, 10, 25, 10)), 0);
-  assert.strictEqual(r(dust(perth(2026, 10, 22, 10), perth(2026, 10, 26, 8))), 0.3);
-  assert.strictEqual(r(dust(perth(2026, 10, 1, 10), perth(2026, 10, 22, 10))), 0.9);
+  assert.strictEqual(dust(perth(2026, 10, 22, 10), perth(2026, 10, 26, 8)), 0.2);
+  assert.strictEqual(dust(perth(2026, 10, 1, 10), perth(2026, 10, 22, 10)), 0.6);
+  assert.strictEqual(dust(perth(2026, 8, 6, 10), perth(2026, 10, 22, 10)), 2.2, '11 weeks');
 });
-test('3 weeks of dust: last two 3.2 + 3.3 = 3.25 avg + 0.9 = 4.15 s, no longer fluent at 4 s cut-off', () => {
-  const stats = F('levelStats_')({ r: [3.1, 3.2, 3.3], n: 5, t: perth(2026, 10, 1, 10) }, 4, perth(2026, 10, 22, 10));
-  assert.strictEqual(stats.avg, 3.25, 'old 3-attempt profiles: only the 2 most recent count');
-  assert.strictEqual(stats.time, 4.15);
-  assert.strictEqual(stats.fluent, false);
+test('3 weeks of dust: last two 3.2 + 3.3 = 3.25 avg + 0.6 = 3.85 s: fluent at 4 s, not at 3.8 s', () => {
+  const entry = { r: [3.1, 3.2, 3.3], n: 5, t: perth(2026, 10, 1, 10) }, now = perth(2026, 10, 22, 10);
+  const a = F('levelStats_')(entry, 4, now), b = F('levelStats_')(entry, 3.8, now);
+  assert.strictEqual(a.avg, 3.25, 'old 3-attempt profiles: only the 2 most recent count');
+  assert.strictEqual(a.time, 3.85); assert.strictEqual(a.fluent, true);
+  assert.strictEqual(b.fluent, false);
 });
 test('fluency time: played once = that attempt; played twice or more = average of the 2 most recent', () => {
   const now = Date.now(), rec = F('recordAttempt_'), st = p => F('levelStats_')(p.add[3], 3, now);
@@ -399,31 +403,31 @@ test('playing a dusty level once removes all its dust', () => {
 });
 test('dusty lower level becomes the current level again', () => {
   const now = perth(2026, 10, 22, 10);
-  const prof = { mul: { 1: { r: [2, 2, 2], n: 3, t: perth(2026, 9, 1, 10) }, 2: { r: [2, 2, 2], n: 3, t: now } } };
+  const prof = { mul: { 1: { r: [2.9, 2.9, 2.9], n: 3, t: perth(2026, 9, 1, 10) }, 2: { r: [2, 2, 2], n: 3, t: now } } }; // 7 weeks = +1.4 s
   const sum = F('opSummary_')(prof, 'mul', 3, now);
   assert.strictEqual(sum.current, 1);
 });
 test('team balancing uses the real average at the class level (dust not added unless BALANCE_ADD_DUST)', () => {
   const now = perth(2026, 10, 22, 10);
-  const prof = { mul: { 1: { r: [4.5, 4.5, 4.5], n: 3, t: perth(2026, 10, 1, 10) } } }; // 3 weeks of dust
+  const prof = { mul: { 1: { r: [4.5, 4.5, 4.5], n: 3, t: perth(2026, 10, 1, 10) } } }; // 3 weeks of dust = 0.6 s
   const sum = F('opSummary_')(prof, 'mul', 4, now);
   assert.strictEqual(sum.classLevel, 1);
   assert.strictEqual(F('expectedTime_')(sum), 4.5);
   F('CONFIG').BALANCE_ADD_DUST = true;
-  assert.strictEqual(F('expectedTime_')(sum), 5.4);
+  assert.strictEqual(F('expectedTime_')(sum), 5.1);
   F('CONFIG').BALANCE_ADD_DUST = false;
 });
 test('class level INCLUDES dust (v12): a level dust pushes over the cut-off is played in class; teams use the undusted time', () => {
-  const now = perth(2026, 10, 22, 10), old = perth(2026, 10, 1, 10); // 3 weeks of dust = +0.9 s
+  const now = perth(2026, 10, 22, 10), old = perth(2026, 10, 1, 10); // 3 weeks of dust = +0.6 s
   const prof = { mul: { 1: { r: [3.5, 3.5], n: 2, t: old }, 2: { r: [3, 3], n: 2, t: old }, 3: { r: [5, 5], n: 2, t: now } } };
   const sum = F('opSummary_')(prof, 'mul', 4, now);
-  assert.strictEqual(sum.current, 1, '3.5 + 0.9 = 4.4 s is over the 4 s cut-off');
+  assert.strictEqual(sum.current, 1, '3.5 + 0.6 = 4.1 s is over the 4 s cut-off');
   assert.strictEqual(sum.classLevel, 1, 'class rounds use the same level');
   assert.strictEqual(F('expectedTime_')(sum), 3.5, 'balancing uses the time without dust');
   const all = {}; for (let L = 1; L <= 18; L++) all[L] = { r: [2], n: 1, t: old };
   const top = F('opSummary_')({ mul: all }, 'mul', 2.5, now);
   assert.strictEqual(top.classLevel, 1); assert.strictEqual(top.classMastered, false);
-  assert.strictEqual(F('opSummary_')({ mul: all }, 'mul', 3, now).classMastered, true, '2 + 0.9 = 2.9 s is fluent at 3 s');
+  assert.strictEqual(F('opSummary_')({ mul: all }, 'mul', 3, now).classMastered, true, '2 + 0.6 = 2.6 s is fluent at 3 s');
 });
 test('fluency uses only the 2 most recent attempts', () => {
   const p = {}; const rec = F('recordAttempt_');
@@ -433,10 +437,11 @@ test('fluency uses only the 2 most recent attempts', () => {
 });
 
 /* ---------- 4. Trophy cabinet ---------- */
-console.log('\nTrophy cabinet: keep / re-roll / platinum / one kept per week');
+console.log('\nTrophy cabinet: keep / re-roll ladder / one kept per week / showcase / trophy room');
 const cab = id => ok(call({ action: 'cabinet', token: tokens[id] })).cabinet;
+const TIERS = ['plat', 'pearl', 'ebony'];
 let winners = [], losers = [], trophy;
-test('winning team: every player who played gets the same trophy, undecided; nobody else does', () => {
+test('winning team: every player who played gets the same basic trophy, undecided; nobody else does', () => {
   const before = Object.fromEntries(ids.map(id => [id, cab(id).week.items.length]));
   ok(call({ action: 'startGame', teacherToken: teacher, code, op: 'mul', teams: 3, seconds: 60 }));
   const st = ok(call({ action: 'roomState', teacherToken: teacher, code })).room;
@@ -462,6 +467,7 @@ test('winning team: every player who played gets the same trophy, undecided; nob
       const mine = after.week.items[0];
       assert.strictEqual(mine.e, trophy.e); assert.strictEqual(mine.team, fastTeam);
       assert.strictEqual(mine.open, true, 'new trophy should be undecided');
+      assert(!mine.tier, 'new trophy should be basic');
       assert.strictEqual(me.trophy.id, mine.id, 'win screen does not know which trophy to keep / re-roll');
       assert.strictEqual(me.trophy.e, trophy.e);
     } else {
@@ -487,36 +493,60 @@ test('keep it: trophy becomes decided; deciding twice is refused', () => {
   assert(!call({ action: 'trophyDecision', token: tokens[id], id: t.id, choice: 'reroll' }).ok, 'could re-roll a decided trophy');
   assert(!call({ action: 'trophyDecision', token: tokens[losers[0]], id: t.id, choice: 'keep' }).ok, 'could decide someone else\'s trophy');
 });
-test('re-roll (real random): either platinum or lost, never anything else', () => {
+test('re-roll (real random): a basic trophy becomes platinum (still undecided) or is lost', () => {
   [winners[1], winners[2]].forEach(id => {
     const t = cab(id).week.items[0];
     const r = ok(call({ action: 'trophyDecision', token: tokens[id], id: t.id, choice: 'reroll' }));
-    assert(r.outcome === 'platinum' || r.outcome === 'lost', r.outcome);
+    assert(r.outcome === 'plat' || r.outcome === 'lost', r.outcome);
     const after = cab(id).week.items.find(x => x.id === t.id);
-    if (r.outcome === 'platinum') assert(after.plat && !after.open);
+    if (r.outcome === 'plat') assert(after.tier === 'plat' && after.open, 'platinum should stay undecided (can keep or risk for pearl)');
     else assert(!after, 'lost trophy is still there');
   });
 });
-test('re-roll outcomes with set dice: <5% platinum, otherwise lost; leftover chance stays gold', () => {
-  const now = perth(2026, 10, 27, 10), give = F('awardTrophy_'), decide = F('decideTrophy_'), C = F('CONFIG');
-  let p = {}, t = give(p, { e: '🦉', n: 'Owl of Athena' }, 'mul', 'X', now);
-  assert.strictEqual(decide(p, t.id, 'reroll', now, 0.049).outcome, 'platinum');
-  assert(p.cab.items[0].plat && !p.cab.items[0].open);
-  assert.throws(() => decide(p, t.id, 'reroll', now, 0.01), /already decided/, 'platinum could be re-rolled');
-  t = give(p, { e: '🔱', n: 'Trident' }, 'mul', 'X', now + 1);
-  assert.strictEqual(decide(p, t.id, 'reroll', now, 0.05).outcome, 'lost');
-  assert(!p.cab.items.some(x => x.id === t.id));
-  const keepLose = C.REROLL_LOSE_CHANCE; C.REROLL_LOSE_CHANCE = 0.5;
-  t = give(p, { e: '👑', n: 'Crown' }, 'mul', 'X', now + 2);
-  const g = decide(p, t.id, 'reroll', now, 0.9);
-  C.REROLL_LOSE_CHANCE = keepLose;
-  assert.strictEqual(g.outcome, 'gold'); assert(g.trophy.open, 'stays undecided so it can be re-rolled again');
-});
-test('re-roll odds: about 5% platinum over 20,000 rolls', () => {
+test('re-roll ladder with set dice: basic->platinum <20%, platinum->pearl <10%, pearl->ebony <5%, else lost', () => {
   const now = perth(2026, 10, 27, 10), give = F('awardTrophy_'), decide = F('decideTrophy_');
-  let plat = 0;
-  for (let i = 0; i < 20000; i++) { const p = {}, t = give(p, { e: '🦉', n: 'Owl' }, 'mul', 'X', now); if (decide(p, t.id, 'reroll', now).outcome === 'platinum') plat++; }
-  assert(plat > 850 && plat < 1150, plat + ' platinum out of 20,000');
+  const fresh = () => { const p = {}, t = give(p, { e: '🦉', n: 'Owl of Athena' }, 'mul', 'X', now); return { p, t }; };
+  // one step at a time, each with its own chance
+  let { p, t } = fresh();
+  assert.strictEqual(decide(p, t.id, 'reroll', now, 0.199).outcome, 'plat');
+  assert(p.cab.items[0].open, 'platinum should still be undecided');
+  assert.strictEqual(decide(p, t.id, 'reroll', now, 0.099).outcome, 'pearl');
+  assert(p.cab.items[0].open, 'pearl should still be undecided');
+  assert.strictEqual(decide(p, t.id, 'reroll', now, 0.049).outcome, 'ebony');
+  assert.strictEqual(p.cab.items[0].tier, 'ebony'); assert(!p.cab.items[0].open, 'ebony is the top: decided automatically');
+  assert.throws(() => decide(p, t.id, 'reroll', now, 0), /already decided/, 'an ebony trophy could be re-rolled');
+  // misses at each step lose the trophy
+  ({ p, t } = fresh()); assert.strictEqual(decide(p, t.id, 'reroll', now, 0.2).outcome, 'lost'); assert.strictEqual(p.cab.items.length, 0);
+  ({ p, t } = fresh()); decide(p, t.id, 'reroll', now, 0); assert.strictEqual(decide(p, t.id, 'reroll', now, 0.1).outcome, 'lost'); assert.strictEqual(p.cab.items.length, 0);
+  ({ p, t } = fresh()); decide(p, t.id, 'reroll', now, 0); decide(p, t.id, 'reroll', now, 0);
+  assert.strictEqual(decide(p, t.id, 'reroll', now, 0.05).outcome, 'lost'); assert.strictEqual(p.cab.items.length, 0);
+  // keeping a platinum stops the ladder
+  ({ p, t } = fresh()); decide(p, t.id, 'reroll', now, 0);
+  assert.strictEqual(decide(p, t.id, 'keep', now).outcome, 'kept');
+  assert.throws(() => decide(p, t.id, 'reroll', now, 0), /already decided/);
+  assert.strictEqual(p.cab.items[0].tier, 'plat');
+});
+test('re-roll odds over 40,000 real rolls per step: about 20%, 10%, 5%', () => {
+  const now = perth(2026, 10, 27, 10), give = F('awardTrophy_'), decide = F('decideTrophy_');
+  [['basic', 0, 0.20], ['plat', 1, 0.10], ['pearl', 2, 0.05]].forEach(([from, climbs, want]) => {
+    let hit = 0; const n = 40000;
+    for (let i = 0; i < n; i++) {
+      const p = {}, t = give(p, { e: '🦉', n: 'Owl' }, 'mul', 'X', now);
+      for (let k = 0; k < climbs; k++) decide(p, t.id, 'reroll', now, 0);
+      if (decide(p, t.id, 'reroll', now).outcome !== 'lost') hit++;
+    }
+    assert(Math.abs(hit / n - want) < 0.008, from + ': ' + (hit / n * 100).toFixed(2) + '% (want ' + want * 100 + '%)');
+  });
+});
+test('the app gets the ladder (next tier names) but no chances; same for everyone', () => {
+  const a = ok(call({ action: 'profile', token: tokens[ids[0]] })).rules.reroll;
+  const b = ok(call({ action: 'profile', token: tokens[ids[9]] })).rules.reroll;
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
+  assert.strictEqual(JSON.stringify(a.steps.map(s => [s.from, s.to, s.name])),
+    JSON.stringify([['basic', 'plat', 'Platinum'], ['plat', 'pearl', 'Pearl'], ['pearl', 'ebony', 'Ebony']]));
+  assert(!/chance|0\.2|0\.1|0\.05|lose/.test(JSON.stringify(a)), 'chances sent to the app: ' + JSON.stringify(a));
+  assert(!/chance/.test(JSON.stringify(ok(call({ action: 'cabinet', token: tokens[ids[0]] })).cabinet.odds)));
+  assert.strictEqual(ok(call({ action: 'profile', token: tokens[ids[0]] })).rules.dustPerWeek, 0.2);
 });
 test('trophy week starts Sunday 00:00 Perth time', () => {
   const wk = F('trophyWeek_');
@@ -546,20 +576,34 @@ test('one trophy kept per week: the chosen one is locked in on Sunday, the rest 
   v = view(p, perth(2026, 12, 25, 9)); // weeks with no trophies lock nothing
   assert.strictEqual(v.locked.length, 2);
 });
-test('no choice made: best one is kept (platinum first, then newest); undecided ones count as gold', () => {
+test('no choice made: highest tier is kept (ebony > pearl > platinum > basic), then newest', () => {
   const give = F('awardTrophy_'), decide = F('decideTrophy_'), view = F('cabinetView_');
+  const climb = (p, t, n, now) => { for (let k = 0; k < n; k++) decide(p, t.id, 'reroll', now, 0); };
   let p = {};
-  const old = give(p, { e: '🦉', n: 'Owl' }, 'mul', 'X', perth(2026, 10, 26, 10));
-  decide(p, old.id, 'reroll', perth(2026, 10, 26, 11), 0.01); // platinum
-  give(p, { e: '🔱', n: 'Trident' }, 'mul', 'X', perth(2026, 10, 30, 10)); // newer, gold, undecided
+  climb(p, give(p, { e: '🦉', n: 'Owl' }, 'mul', 'X', perth(2026, 10, 26, 10)), 1, perth(2026, 10, 26, 11));     // platinum
+  climb(p, give(p, { e: '🔱', n: 'Trident' }, 'mul', 'X', perth(2026, 10, 27, 10)), 3, perth(2026, 10, 27, 11)); // ebony (older than the next two)
+  climb(p, give(p, { e: '👑', n: 'Crown' }, 'mul', 'X', perth(2026, 10, 28, 10)), 2, perth(2026, 10, 28, 11));   // pearl
+  give(p, { e: '🏆', n: 'Cup' }, 'mul', 'X', perth(2026, 10, 30, 10)); // newest, basic, undecided
   assert.strictEqual(view(p, perth(2026, 10, 30, 11)).week.chosen, false);
   let v = view(p, perth(2026, 11, 1, 1));
-  assert.strictEqual(v.locked[0].e, '🦉'); assert(v.locked[0].plat, 'platinum not preferred');
+  assert.strictEqual(v.locked[0].e, '🔱'); assert.strictEqual(v.locked[0].tier, 'ebony', 'ebony not preferred');
+  assert(!v.locked[0].open);
   p = {};
   give(p, { e: '🦉', n: 'Owl' }, 'mul', 'X', perth(2026, 10, 26, 10));
   give(p, { e: '🔱', n: 'Trident' }, 'mul', 'X', perth(2026, 10, 30, 10));
   v = view(p, perth(2026, 11, 1, 1));
   assert.strictEqual(v.locked[0].e, '🔱', 'newest not kept'); assert(!v.locked[0].open);
+});
+test('old platinum trophies (plat: true) are read as tier platinum and converted', () => {
+  const view = F('cabinetView_'), wk = F('trophyWeek_'), now = perth(2026, 10, 27, 10);
+  const p = { cab: { wk: wk(now), keep: null, items: [{ id: 'a', e: '🦉', n: 'Owl', t: now - 1000, plat: true }],
+                     locked: [{ id: 'b', e: '🔱', n: 'Trident', t: now - 9e8, plat: true, wk: wk(now) - 2 }] } };
+  const v = view(p, now);
+  assert.strictEqual(v.week.items[0].tier, 'plat'); assert(!('plat' in v.week.items[0]));
+  assert.strictEqual(v.locked[0].tier, 'plat');
+  assert.strictEqual(F('tierOf_')({ plat: true }), 'plat');
+  const q = { cab: { wk: wk(now), items: [{ id: 'z', e: '🦉', n: 'Owl', t: now, plat: true, open: true }], locked: [] } };
+  assert.strictEqual(F('decideTrophy_')(q, 'z', 'reroll', now, 0.01).outcome, 'pearl', 'an undecided old platinum trophy should re-roll for pearl');
 });
 test('losing the chosen trophy in a re-roll clears the choice', () => {
   const give = F('awardTrophy_'), decide = F('decideTrophy_'), keep = F('setKeeper_'), view = F('cabinetView_'), p = {};
@@ -571,7 +615,7 @@ test('losing the chosen trophy in a re-roll clears the choice', () => {
   const v = view(p, now + 4);
   assert.strictEqual(v.week.chosen, false); assert.strictEqual(v.week.items.length, 1);
 });
-test('server actions: setKeeper (and old setFavourite) pick the week\'s trophy; locked week is saved', () => {
+test('server actions: setKeeper (and old setFavourite) pick the week\'s trophy', () => {
   const id = winners[0], t = cab(id).week.items[0];
   let c = ok(call({ action: 'setKeeper', token: tokens[id], id: t.id })).cabinet;
   assert.strictEqual(c.week.keeper, t.id); assert(c.week.chosen);
@@ -599,6 +643,62 @@ test('at most TROPHY_SHELF_MAX trophies in a week; every trophy has a name; neve
   assert(F('CONFIG').TROPHIES.every(t => t[0] && t[1]));
   const seen = new Set(); for (let i = 0; i < 200; i++) seen.add(F('pickTrophy_')('🏆').e);
   assert(!seen.has('🏆'), 'pickTrophy_ repeated the previous round\'s trophy');
+});
+test('showcase: defaults to the best locked-in trophy; the student can pick any locked-in one (not this week\'s)', () => {
+  const give = F('awardTrophy_'), decide = F('decideTrophy_'), show = F('setShowcase_'), view = F('cabinetView_'), p = {};
+  const a = give(p, { e: '🦉', n: 'Owl' }, 'mul', 'X', perth(2026, 10, 27, 10));
+  decide(p, a.id, 'reroll', perth(2026, 10, 27, 11), 0); decide(p, a.id, 'reroll', perth(2026, 10, 27, 11), 0); // pearl -> locked on Sun 1 Nov
+  give(p, { e: '🔱', n: 'Trident' }, 'mul', 'X', perth(2026, 11, 3, 10));   // basic -> locked on Sun 8 Nov
+  const now = perth(2026, 11, 10, 10);
+  const c = give(p, { e: '👑', n: 'Crown' }, 'mul', 'X', now);              // this week's, not locked yet
+  let v = view(p, now);
+  assert.strictEqual(v.locked.length, 2);
+  assert.strictEqual(v.showcase.id, a.id, 'best locked-in (pearl) should be shown by default');
+  assert.strictEqual(v.showcase.chosen, false);
+  const trident = v.locked.find(t => t.e === '🔱');
+  show(p, trident.id, now);
+  v = view(p, now);
+  assert.strictEqual(v.showcase.id, trident.id); assert.strictEqual(v.showcase.chosen, true);
+  assert.throws(() => show(p, c.id, now), /Only trophies locked/, 'this week\'s trophy could be showcased');
+  v = view(p, perth(2026, 11, 20, 10)); // more weeks lock: the chosen showcase stays
+  assert.strictEqual(v.showcase.id, trident.id);
+});
+test('server actions: setShowcase saves; trophyRoom lists names + showcase trophies only, sorted, read-only', () => {
+  // Give two students a locked-in trophy by backdating their cabinets a week.
+  const back = id => { const p = F('getProfile_')(id); p.cab.wk -= 1; F('saveProfiles_')({ [id]: p }); };
+  const wid = winners[0];
+  back(wid);
+  const c = cab(wid);
+  assert(c.locked.length >= 1, 'backdated week was not locked in');
+  const pick = c.locked[0];
+  assert(!call({ action: 'setShowcase', token: tokens[wid], id: 'nope' }).ok);
+  assert(!call({ action: 'setShowcase', token: tokens[losers[0]], id: pick.id }).ok, 'could showcase someone else\'s trophy');
+  const r = ok(call({ action: 'setShowcase', token: tokens[wid], id: pick.id })).cabinet;
+  assert.strictEqual(r.showcase.id, pick.id); assert(r.showcase.chosen);
+  vm.runInContext('clearCache()', ctx);
+  assert.strictEqual(cab(wid).showcase.id, pick.id, 'showcase not saved to the sheet');
+
+  // A second student whose finished week has NOT been opened yet still appears (worked out on a copy).
+  const other = winners.find(id => id !== wid && cab(id).week.items.length) || winners[1];
+  const op = F('getProfile_')(other);
+  if (!op.cab || !op.cab.items.length) { F('awardTrophy_')(op, { e: '🐬', n: 'Dolphin of Apollo' }, 'mul', 'X', Date.now()); }
+  op.cab.wk -= 1; F('saveProfiles_')({ [other]: op });
+  const sheetBefore = JSON.stringify(ctx.SpreadsheetApp.getActive().getSheetByName('Profiles').getDataRange().getValues());
+
+  const room = ok(call({ action: 'trophyRoom', token: tokens[losers[0]] })).room;
+  assert.strictEqual(room.students, 12);
+  const names = room.plinths.map(p => p.name);
+  assert(names.includes(nameOf[wid]) && names.includes(nameOf[other]), 'missing plinth: ' + names);
+  assert.deepStrictEqual(names, names.slice().sort((a, b) => a.localeCompare(b)), 'not sorted by name');
+  const mine = room.plinths.find(p => p.name === nameOf[wid]);
+  assert.strictEqual(mine.e, pick.e); assert.strictEqual(mine.me, false);
+  assert(room.plinths.every(p => !p.me), 'a student who has no plinth was marked as "me"');
+  const raw = JSON.stringify(room);
+  assert(!/"id"|"level|"avg|"r":|password|token/i.test(raw), 'trophy room sent more than names + trophies: ' + raw.slice(0, 200));
+  assert.strictEqual(ok(call({ action: 'trophyRoom', token: tokens[wid] })).room.plinths.find(p => p.name === nameOf[wid]).me, true);
+  assert.strictEqual(JSON.stringify(ctx.SpreadsheetApp.getActive().getSheetByName('Profiles').getDataRange().getValues()), sheetBefore,
+    'opening the trophy room wrote to the sheet');
+  assert(!call({ action: 'trophyRoom' }).ok, 'trophy room open without logging in');
 });
 
 /* ---------- 5. Play again, no-result rounds, placings ---------- */
@@ -783,14 +883,14 @@ test('no points anywhere in what the server sends', () => {
 });
 
 test('class round: dusty level is played, its undusted time balances the teams, the round clears the dust and counts', () => {
-  const now = Date.now(), old = now - 21 * 86400000, id = ids[10]; // 3 weeks ago: 0.9 s of dust
+  const now = Date.now(), old = now - 21 * 86400000, id = ids[10]; // 3 weeks ago: 0.6 s of dust
   const p = F('getProfile_')(id);
   p.div = { 1: { r: [3.5, 3.5], n: 2, t: old }, 2: { r: [5, 5], n: 2, t: old } };
   F('saveProfiles_')({ [id]: p });
   assert.strictEqual(F('opSummary_')(p, 'div', 4, now).current, 1, 'test set-up: dust makes level 1 not fluent');
   const room = ok(call({ action: 'playAgain', teacherToken: teacher, code, op: 'div', seconds: 60, teams: 3 })).room;
   const m = [].concat(...room.game.teams.map(t => t.members)).find(x => x.name === nameOf[id]);
-  assert.strictEqual(m.level, 1, 'should play level 1: 3.5 s + 0.9 s dust is over the 4 s cut-off');
+  assert.strictEqual(m.level, 1, 'should play level 1: 3.5 s + 0.6 s dust is over the 4 s cut-off');
   assert.strictEqual(m.exp, 3.5, 'expected time should be the level 1 time with no dust');
   assert.strictEqual(m.est, false);
   assert.strictEqual(ok(call({ action: 'roomState', token: tokens[id] })).room.game.level, 1);
@@ -850,7 +950,7 @@ test('Code.gs is up to date with server/*.js (run node tools/build-apps-script.j
   const gs = fs.readFileSync(path.join(ROOT, 'apps-script/Code.gs'), 'utf8');
   order.forEach(f => assert(gs.includes(fs.readFileSync(path.join(ROOT, 'server', f), 'utf8')), 'Code.gs is missing the current ' + f));
 });
-test('Code.gs on its own: start a game, finish, then Play again (same, new, individual)', () => {
+test('Code.gs on its own: start a game, finish, Play again (same, new, individual), cabinet + trophy room', () => {
   const g = { console, Date, Math, JSON }; g.globalThis = g; vm.createContext(g);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/demo/mock-gas.js'), 'utf8'), g);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'apps-script/Code.gs'), 'utf8'), g, { filename: 'Code.gs' });
@@ -868,11 +968,14 @@ test('Code.gs on its own: start a game, finish, then Play again (same, new, indi
     assert.strictEqual(r.status, 'playing'); assert.strictEqual(r.game.teams.length, n);
     play();
   });
+  assert(c({ action: 'cabinet', token: toks[0] }).cabinet.showcase);
+  assert(Array.isArray(c({ action: 'trophyRoom', token: toks[0] }).room.plinths));
 });
 test('server version in Code.gs matches js/config.js (otherwise the teacher page shows a warning)', () => {
   const page = fs.readFileSync(path.join(ROOT, 'js/config.js'), 'utf8').match(/SERVER_VERSION:\s*(\d+)/);
   assert(page, 'SERVER_VERSION missing from js/config.js');
   assert.strictEqual(ok(call({ action: 'teacherInfo', teacherToken: teacher })).rules.serverVersion, Number(page[1]));
+  assert.strictEqual(Number(page[1]), 14);
 });
 
 console.log(failures ? '\n' + failures + ' FAILED\n' : '\nAll tests passed\n');

@@ -1,8 +1,10 @@
 /**
  * RESULTS & CELEBRATION — shared by the teacher screen and student screens.
  * Celebrate.results(el, {teams, myTeam, me, showMembers, penalty, odds, big})
- * Celebrate.trophy(t, cls) -> HTML for one golden (or platinum) trophy emoji (also used by the trophy cabinet).
- * Celebrate.decision(t, odds) -> "Put it in my cabinet / Re-roll" buttons for an undecided trophy. js/student.js wires them up.
+ * Celebrate.trophy(t, cls) -> HTML for one trophy emoji, coloured by its tier (basic gold, platinum, pearl, ebony).
+ * Celebrate.decision(t, ladder) -> "Put it in my cabinet / Re-roll for <next tier>" buttons for an undecided trophy, with an
+ *   empty .power-slot that js/student.js fills with the re-roll power bar. No chances are shown (Haydn's design).
+ * Celebrate.tierOf(t), Celebrate.tierName(id), Celebrate.nextStep(t, ladder) -> tier helpers (also used by the trophy room).
  *
  * Placings come from the server (team.rank):
  *  - rank null = no result (no correct answers): no place, no medal, listed last as "No result".
@@ -14,6 +16,8 @@
   var esc = function (s) { return Game.esc(s); };
   var medal = ['🥇', '🥈', '🥉'];
   var MAX_DP = 6;
+  var TIER_NAMES = { plat: 'Platinum', pearl: 'Pearl', ebony: 'Ebony' };
+  var DEFAULT_LADDER = { steps: [{ from: 'basic', to: 'plat', name: 'Platinum' }, { from: 'plat', to: 'pearl', name: 'Pearl' }, { from: 'pearl', to: 'ebony', name: 'Ebony' }] };
 
   function fmtTime(t, dp) { return t === null || t === undefined ? '—' : t.toFixed(dp || 2) + ' s'; }
 
@@ -43,24 +47,38 @@
     return t.correct > 0 ? i + 1 : null;
   }
 
-  /** A trophy emoji drawn in gold, or platinum if t.plat (the colour comes from the .trophy / .trophy.plat CSS filters). */
-  function trophy(t, cls) {
-    return '<span class="trophy' + (t.plat ? ' plat' : '') + (cls ? ' ' + cls : '') + '" role="img" aria-label="' + esc(trophyName(t)) + '">' + esc(t.e) + '</span>';
+  /* ---------- Tiers ---------- */
+  /** 'basic', 'plat', 'pearl' or 'ebony' (old trophies used plat: true). */
+  function tierOf(t) { return (t && (t.tier || (t.plat ? 'plat' : ''))) || 'basic'; }
+  function tierName(id) { return TIER_NAMES[id] || ''; }
+  /** The re-roll ladder from the server ({steps: [{from, to, name}]}); older servers sent something else. */
+  function ladder(l) { return l && l.steps ? l : DEFAULT_LADDER; }
+  /** The step this trophy would take if re-rolled, or null (already the top tier). */
+  function nextStep(t, l) {
+    var tier = tierOf(t), steps = ladder(l).steps;
+    for (var i = 0; i < steps.length; i++) if (steps[i].from === tier) return steps[i];
+    return null;
   }
-  function trophyName(t) { return (t.plat ? 'Platinum ' : '') + t.n; }
+
+  /** A trophy emoji drawn gold (basic) or in its tier's colour (the colour comes from CSS filters on .trophy). */
+  function trophy(t, cls) {
+    var tier = tierOf(t);
+    return '<span class="trophy' + (tier !== 'basic' ? ' ' + tier : '') + (cls ? ' ' + cls : '') + '" role="img" aria-label="' + esc(trophyName(t)) + '">' + esc(t.e) + '</span>';
+  }
+  function trophyName(t) { var n = tierName(tierOf(t)); return (n ? n + ' ' : '') + t.n; }
   function pct(x) { return Math.round(x * 1000) / 10 + '%'; }
 
-  /** Keep / re-roll buttons for an undecided trophy. odds = {platinum, lose}. */
-  function decision(t, odds) {
-    odds = odds || { platinum: 0.05, lose: 0.95 };
-    var stay = 1 - odds.platinum - odds.lose;
-    return '<div class="decide" data-decide-for="' + esc(t.id) + '">' +
+  /** Keep / re-roll buttons for an undecided trophy. No chances are shown: the power bar (.power-slot) goes above the buttons. */
+  function decision(t, l) {
+    var step = nextStep(t, l);
+    if (!step) return '';
+    return '<div class="decide" data-decide-for="' + esc(t.id) + '" data-next="' + esc(step.to) + '" data-next-name="' + esc(step.name) + '">' +
+      '<div class="power-slot"></div>' +
       '<div class="decide-btns">' +
         '<button class="btn primary" data-decide="keep">🏆 Put it in my cabinet</button>' +
-        '<button class="btn reroll" data-decide="reroll">🎲 Re-roll</button>' +
+        '<button class="btn reroll ' + esc(step.to) + '" data-decide="reroll">🎲 Re-roll for ' + esc(step.name) + '</button>' +
       '</div>' +
-      '<div class="decide-odds">Re-roll: <b>' + pct(odds.platinum) + '</b> chance it turns <b>platinum</b>, ' +
-        '<b>' + pct(odds.lose) + '</b> chance you <b>lose it</b>' + (stay > 0.0001 ? ', ' + pct(stay) + ' it stays gold' : '') + '.</div>' +
+      '<div class="decide-odds">If the re-roll works, it turns <b>' + esc(step.name) + '</b>. If it doesn\'t, the trophy is <b>gone</b>!</div>' +
     '</div>';
   }
 
@@ -90,7 +108,7 @@
           (iWon ? '<div class="you-badge">That\'s you! 🎉</div>' : '') +
         '</div>';
 
-    // Shown only on the iPads of the winning team's players.
+    // Shown only on the iPads of the winning team's players. js/student.js fills .power-slot with the re-roll power bar.
     var won = o.me && o.me.trophy ? '<div class="trophy-won">' +
         '<div class="trophy-won-rays" aria-hidden="true"></div>' +
         trophy(o.me.trophy, 'xl') +
@@ -163,5 +181,6 @@
     })();
   }
 
-  window.Celebrate = { results: results, confetti: confetti, fmtTime: fmtTime, trophy: trophy, trophyName: trophyName, decision: decision, decimals: decimals };
+  window.Celebrate = { results: results, confetti: confetti, fmtTime: fmtTime, trophy: trophy, trophyName: trophyName, decision: decision,
+                       decimals: decimals, tierOf: tierOf, tierName: tierName, nextStep: nextStep, ladder: ladder, pct: pct };
 })();

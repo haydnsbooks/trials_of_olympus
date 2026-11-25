@@ -13,7 +13,7 @@
  *                    Every saved game counts: practice AND class rounds (penalty included in both).
  *   fluency time   = played once: that attempt's time. Played twice or more: average of the 2 most recent attempts.
  *                    Plus dust.
- *   dust           = 0.3 s for every new week (Monday) since the level was last played.
+ *   dust           = DUST_PER_WEEK (0.2 s) for every new week (Monday) since the level was last played.
  *                    Playing the level once (practice or class) clears all of it.
  *   fluent         = at least MIN_ATTEMPTS_FOR_FLUENCY attempts (currently 1) AND fluency time (with dust) <= cut-off
  *   current level  = the LOWEST level that is not fluent, counting levels never tried as not fluent
@@ -35,7 +35,8 @@ function weekIndex_(ms) {
 }
 function dustFor_(lastMs, nowMs) {
   if (!lastMs) return 0;
-  return Math.max(0, weekIndex_(nowMs) - weekIndex_(lastMs)) * CONFIG.DUST_PER_WEEK;
+  var weeks = Math.max(0, weekIndex_(nowMs) - weekIndex_(lastMs));
+  return Math.round(weeks * CONFIG.DUST_PER_WEEK * 1000) / 1000; // e.g. 3 × 0.2 = 0.6 exactly (not 0.6000000000000001)
 }
 
 function cutoffs_() {
