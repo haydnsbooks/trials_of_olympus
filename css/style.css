@@ -432,21 +432,14 @@ select:focus, input:focus { outline: none; border-color: var(--gold); }
 .version-warn li { margin: 4px 0; }
 
 /* =====================================================================
-   v9 — penalty on the play screen, platinum trophies, keep / re-roll, weekly keep in the cabinet
+   v9 — penalty on the play screen, keep / re-roll, weekly keep in the cabinet
    ===================================================================== */
 .hud-item.penalised .hud-val { color: #ffb4a8; }
 
-/* Platinum: any emoji turned silver-white with a cool shimmer (gold comes from the .trophy filter above) */
-.trophy.plat {
-  filter: grayscale(1) brightness(1.45) contrast(1.2)
-          drop-shadow(0 2px 0 rgba(60, 70, 95, .6)) drop-shadow(0 0 12px rgba(205, 230, 255, .95));
-}
 .trophy.shine { animation: shine 1.4s ease-out both; }
 @keyframes shine { 0% { transform: scale(.6) rotate(-20deg); } 50% { transform: scale(1.25) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
 .trophy.vanish { animation: vanish 1s ease-in forwards; }
 @keyframes vanish { to { transform: scale(.2) translateY(-30px) rotate(25deg); opacity: 0; filter: blur(6px); } }
-.trophy-won.plat { background: radial-gradient(ellipse at 30% 50%, #5d6b8a 0%, #1f2742 70%); border-color: #dfe8f5; }
-.trophy-won.plat .trophy-won-kicker, .trophy-won.plat .trophy-won-name { color: #eef4ff; }
 .trophy-won.lost { filter: saturate(.4); }
 
 /* Keep / re-roll choice */
@@ -454,14 +447,12 @@ select:focus, input:focus { outline: none; border-color: var(--gold); }
 .decide-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .decide .btn { min-width: 210px; font-size: 1.1rem; }
 .btn.reroll { background: linear-gradient(180deg, #eef2fa, #c9d3e6); color: var(--ink); box-shadow: 0 4px 0 #8c97ad; }
-.decide-odds { font-size: .9rem; font-weight: 700; margin-top: 8px; opacity: .9; }
+.decide-odds { font-size: .9rem; font-weight: 700; margin-top: 8px; opacity: .95; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
 .rolling { margin-top: 10px; font-family: var(--display); font-weight: 700; font-size: 1.3rem; }
 .dice { display: inline-block; font-size: 2rem; animation: roll .35s linear infinite; }
 @keyframes roll { to { transform: rotate(360deg); } }
 .outcome { position: relative; flex-basis: 100%; text-align: center; font-family: var(--display); font-weight: 700; font-size: 1.25rem; margin-top: 8px; }
-.outcome.plat { color: #eef4ff; text-shadow: 0 0 12px rgba(205, 230, 255, .9); }
 .cabinet-card .outcome { background: var(--marble); border: 2px solid var(--line); border-radius: var(--r-control); padding: 10px; margin: 0 0 12px; color: var(--ink); text-shadow: none; }
-.cabinet-card .outcome.plat { border-color: #9fb2d3; background: #eef3fb; }
 .cabinet-card .outcome.lost { border-color: var(--wine); background: var(--wine-soft); }
 .cabinet-card .outcome.kept { border-color: var(--laurel); background: var(--laurel-soft); }
 
@@ -473,7 +464,6 @@ select:focus, input:focus { outline: none; border-color: var(--gold); }
 .trophy-slot.keeper { background: rgba(255, 226, 150, .16); box-shadow: inset 0 0 0 2px var(--gold-light); }
 .trophy-slot.selected { background: rgba(255, 255, 255, .14); box-shadow: inset 0 0 0 2px #fff; }
 .slot-badge { position: absolute; top: 2px; right: 4px; font-size: 1rem; line-height: 1; }
-.locked-slot { cursor: default; }
 .slot-week { font-size: .62rem; font-weight: 700; color: rgba(255, 240, 210, .7); text-align: center; line-height: 1.1; }
 .trophy-detail {
   display: flex; gap: 18px; align-items: center; flex-wrap: wrap; background: #fff; border: 2px solid var(--gold);
@@ -485,9 +475,157 @@ select:focus, input:focus { outline: none; border-color: var(--gold); }
 .detail-from { color: var(--muted); font-weight: 700; }
 .detail-note { margin: 8px 0 4px; font-weight: 700; }
 .detail-keep { font-weight: 800; color: var(--gold-deep); margin: 10px 0 0; }
-.trophy-detail #keep-this { margin-top: 10px; }
+.trophy-detail #keep-this, .trophy-detail #show-this { margin-top: 10px; }
 .trophy-detail .decide { text-align: left; margin: 6px 0 4px; }
-.trophy-detail .decide-btns { justify-content: flex-start; }
+.trophy-detail .decide-btns, .trophy-detail .decide-odds { justify-content: flex-start; }
 .trophy-detail .decide .btn { min-width: 0; }
 .trophy-detail .decide-odds { color: var(--muted); }
 @media (max-width: 520px) { .decide .btn { min-width: 0; width: 100%; } .slot-week { font-size: .55rem; } }
+
+/* =====================================================================
+   v11 — trophy tiers (platinum, pearl, ebony), fluency meter, showcase, trophy room
+   ===================================================================== */
+/* Tiers: each filter replaces the gold one on .trophy. Rarest last. */
+.trophy.plat {
+  filter: grayscale(1) brightness(1.45) contrast(1.2)
+          drop-shadow(0 2px 0 rgba(60, 70, 95, .6)) drop-shadow(0 0 12px rgba(205, 230, 255, .95));
+}
+.trophy.pearl {
+  filter: grayscale(1) brightness(1.7) contrast(.9) sepia(.45) hue-rotate(275deg) saturate(2.2)
+          drop-shadow(0 2px 0 rgba(120, 80, 120, .5)) drop-shadow(0 0 7px rgba(255, 190, 230, .95)) drop-shadow(0 0 16px rgba(170, 235, 255, .8));
+}
+.trophy.ebony {
+  filter: grayscale(1) brightness(.4) contrast(1.5)
+          drop-shadow(0 0 1.5px rgba(255, 222, 140, 1)) drop-shadow(0 0 1.5px rgba(255, 222, 140, 1))
+          drop-shadow(0 0 10px rgba(180, 130, 255, 1)) drop-shadow(0 0 20px rgba(244, 210, 122, .6));
+}
+.trophy-won.plat { background: radial-gradient(ellipse at 30% 50%, #5d6b8a 0%, #1f2742 70%); border-color: #dfe8f5; }
+.trophy-won.pearl { background: radial-gradient(ellipse at 30% 50%, #8a6a8c 0%, #2c2340 70%); border-color: #ffe3f3; }
+.trophy-won.ebony { background: radial-gradient(ellipse at 30% 50%, #3a2458 0%, #07060d 72%); border-color: #b48cff; }
+.trophy-won.plat .trophy-won-kicker, .trophy-won.plat .trophy-won-name { color: #eef4ff; }
+.trophy-won.pearl .trophy-won-kicker, .trophy-won.pearl .trophy-won-name { color: #fff0fa; }
+.trophy-won.ebony .trophy-won-kicker, .trophy-won.ebony .trophy-won-name { color: #e2d3ff; }
+.outcome.tier { color: #fff; text-shadow: 0 0 12px rgba(255, 255, 255, .7); }
+.cabinet-card .outcome.tier { color: var(--ink); text-shadow: none; }
+.cabinet-card .outcome.tier.plat { border-color: #9fb2d3; background: #eef3fb; }
+.cabinet-card .outcome.tier.pearl { border-color: #e2b4d3; background: #fff3fa; }
+.cabinet-card .outcome.tier.ebony { border-color: #6b4aa8; background: #1d1430; color: #e8dcff; }
+
+/* Odds chips under the re-roll button */
+.odds-chip { display: inline-flex; gap: 4px; align-items: baseline; padding: 2px 9px; border-radius: 999px; background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .25); }
+.trophy-detail .odds-chip { background: var(--marble-shade); border-color: var(--line); color: var(--ink); }
+.odds-chip.plat { border-color: #cfdcf2; }
+.odds-chip.pearl { border-color: #f2c6e2; }
+.odds-chip.ebony { border-color: #9a77e0; }
+.odds-chip.lose { border-color: rgba(255, 140, 140, .6); }
+
+/* Fluency meter: a dark plaque so it reads the same on marble (menu, cabinet) and on the dark win panel */
+.fluency-meter {
+  position: relative; flex-basis: 100%; text-align: left; margin: 14px 0 6px; padding: 12px 14px 10px; border-radius: var(--r-control);
+  background: linear-gradient(180deg, #1d2552, #121a3e); color: #fff; border: 1px solid rgba(244, 210, 122, .55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.fm-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.fm-label { font-family: var(--display); font-weight: 700; color: var(--gold-light); }
+.fm-num { font-weight: 800; font-variant-numeric: tabular-nums; }
+.fm-num b { color: var(--gold-light); font-size: 1.15rem; }
+.fm-bar { height: 12px; margin: 8px 0 6px; border-radius: 99px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+.fm-bar div { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--gold-deep), var(--gold-light)); box-shadow: 0 0 10px rgba(244, 210, 122, .7); transition: width .6s ease-out; }
+.fm-note { margin: 0; font-size: .88rem; font-weight: 700; color: rgba(255, 255, 255, .88); }
+.menu-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 520px) { .menu-pair { grid-template-columns: 1fr; } }
+
+/* Showcase badge in the cabinet */
+.trophy-slot.showcase { background: rgba(200, 220, 255, .12); box-shadow: inset 0 0 0 2px #dfe8f5; }
+
+/* Trophy room: an endless hall of marble plinths */
+.room-card { padding-bottom: 16px; }
+.hall {
+  position: relative; height: 400px; margin: 10px -8px 6px; border-radius: 8px; overflow: hidden; cursor: grab;
+  touch-action: pan-y; -webkit-user-select: none; user-select: none; outline-offset: 3px;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255, 226, 150, .16), transparent 70%),
+    linear-gradient(180deg, #0b1030 0%, #1a1f4a 62%, #2a2248 100%);
+  border: 3px solid var(--gold); box-shadow: inset 0 0 50px rgba(0, 0, 0, .7), 0 10px 24px rgba(4, 8, 30, .4);
+}
+.hall.dragging { cursor: grabbing; }
+.hall-columns {
+  position: absolute; inset: 0 0 70px; pointer-events: none; opacity: .18;
+  background: repeating-linear-gradient(90deg, transparent 0 150px, rgba(255, 255, 255, .5) 150px 154px, rgba(255, 255, 255, .15) 154px 176px, rgba(255, 255, 255, .5) 176px 180px, transparent 180px 210px);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%); mask-image: linear-gradient(180deg, transparent, #000 30%);
+}
+.hall-floor {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 74px; pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 2px, transparent 2px 70px),
+    linear-gradient(180deg, #3b3560, #1b1733);
+  border-top: 2px solid rgba(244, 210, 122, .5);
+}
+.hall-track { position: absolute; inset: 0; z-index: 1; }
+.plinth-slot { position: absolute; left: 0; top: 0; bottom: 0; display: flex; justify-content: center; will-change: transform; }
+.plinth { position: relative; width: 168px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 30px; }
+.plinth-light {
+  position: absolute; top: 0; left: 50%; width: 220px; height: 300px; transform: translateX(-50%); pointer-events: none;
+  background: radial-gradient(ellipse 45% 100% at 50% 0%, rgba(255, 236, 180, .32), transparent 75%);
+  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+}
+.plinth-trophy { position: relative; margin-bottom: 4px; }
+.plinth-trophy .trophy.xl { font-size: 4.8rem; animation: hover 3.2s ease-in-out infinite; }
+@keyframes hover { 50% { transform: translateY(-6px); } }
+.plinth-cap { width: 150px; height: 14px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--gold-light), var(--gold) 50%, var(--gold-deep)); box-shadow: 0 3px 6px rgba(0, 0, 0, .35); }
+.plinth-body {
+  width: 128px; min-height: 140px; padding: 10px 6px 8px; text-align: center; color: var(--ink);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px;
+  background:
+    linear-gradient(118deg, transparent 38%, var(--vein) 40%, transparent 43%),
+    repeating-linear-gradient(90deg, #f3f5f8 0 9px, #d3d8e2 9px 11px, #fbfcfd 11px 16px);
+  box-shadow: inset 0 -10px 18px rgba(0, 0, 0, .18);
+}
+.plinth-tname { font-family: var(--display); font-weight: 900; font-size: .9rem; line-height: 1.1; background: rgba(255, 255, 255, .85); border-radius: 4px; padding: 2px 6px; }
+.plinth-tier { font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 1px 8px; border-radius: 999px; background: #fff; border: 1px solid var(--line); }
+.plinth-tier.plat { border-color: #9fb2d3; color: #3d4c6b; }
+.plinth-tier.pearl { border-color: #e2b4d3; color: #7a3d68; }
+.plinth-tier.ebony { background: #1d1430; border-color: #6b4aa8; color: #e8dcff; }
+.plinth-plate {
+  margin-top: auto; width: 100%; font-weight: 800; font-size: .88rem; line-height: 1.15; padding: 5px 4px; border-radius: 3px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold)); color: #2b1d02; box-shadow: 0 2px 0 var(--gold-deep);
+  overflow-wrap: anywhere;
+}
+.plinth-you { font-weight: 700; }
+.plinth-base { width: 160px; height: 16px; border-radius: 2px; background: linear-gradient(180deg, #e9ecf2, #aab1c0); box-shadow: 0 8px 14px rgba(0, 0, 0, .5); }
+.plinth.mine .plinth-light { background: radial-gradient(ellipse 45% 100% at 50% 0%, rgba(255, 236, 180, .55), transparent 75%); }
+.plinth.mine .plinth-cap { box-shadow: 0 0 16px rgba(244, 210, 122, .9); }
+.hall-hint { color: var(--muted); font-weight: 800; letter-spacing: .1em; margin: 0 0 8px; }
+@media (max-width: 520px) { .hall { height: 360px; margin: 10px -4px 6px; } .plinth-trophy .trophy.xl { font-size: 4rem; } }
+
+/* =====================================================================
+   v12 — re-roll power bar (above every Re-roll button)
+   ===================================================================== */
+.power-bar {
+  position: relative; text-align: left; margin: 4px 0 12px; padding: 10px 14px 8px; border-radius: var(--r-control);
+  background: linear-gradient(180deg, #2a1d55, #150f33); color: #fff; border: 2px solid #8f6cff;
+  box-shadow: 0 0 18px rgba(143, 108, 255, .45), inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+.pb-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pb-label { font-family: var(--display); font-weight: 900; letter-spacing: .04em; color: #e2d3ff; }
+.pb-num { font-family: var(--display); font-weight: 900; font-size: 1.35rem; color: var(--gold-light); font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(244, 210, 122, .7); }
+.pb-track { position: relative; height: 20px; margin: 6px 0; border-radius: 99px; background: rgba(0, 0, 0, .45); overflow: hidden; border: 1px solid rgba(255, 255, 255, .2); }
+.pb-fill {
+  position: absolute; inset: 0 auto 0 0; border-radius: 99px;
+  background: linear-gradient(90deg, #6a3df0, #b46cff 45%, var(--gold-light));
+  box-shadow: 0 0 14px rgba(244, 210, 122, .8); transition: width .8s ease-out; overflow: hidden;
+}
+.pb-fill::after {
+  content: ''; position: absolute; inset: 0; animation: pb-shimmer 1.8s linear infinite;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%); background-size: 200% 100%;
+}
+@keyframes pb-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+.pb-ticks { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(0, 0, 0, .35) calc(10% - 2px) 10%); pointer-events: none; }
+.pb-note { margin: 0; font-size: .84rem; font-weight: 700; color: rgba(255, 255, 255, .88); }
+.power-bar.full { border-color: var(--gold-light); box-shadow: 0 0 26px rgba(244, 210, 122, .8); animation: pb-pulse 1.6s ease-in-out infinite; }
+@keyframes pb-pulse { 50% { box-shadow: 0 0 36px rgba(244, 210, 122, 1); } }
+.trophy-detail .power-bar { margin-top: 8px; }
+.btn.reroll.plat { background: linear-gradient(180deg, #f4f7fc, #c3cde0); }
+.btn.reroll.pearl { background: linear-gradient(180deg, #fff5fb, #ecc8de); box-shadow: 0 4px 0 #b78ca8; }
+.btn.reroll.ebony { background: linear-gradient(180deg, #4a3a6e, #1b1330); color: #f0e6ff; box-shadow: 0 4px 0 #0b0716; }
+.decide-odds { display: block; }

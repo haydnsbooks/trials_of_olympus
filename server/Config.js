@@ -9,7 +9,7 @@
 var CONFIG = {
   // Which version of the server code this is. js/config.js has the matching SERVER_VERSION; if they differ,
   // the teacher page shows a warning that Apps Script is running old code. Change BOTH when the server changes.
-  SERVER_VERSION: 13,
+  SERVER_VERSION: 14,
 
   // Number of levels per operation. Must match js/levels.js.
   LEVEL_COUNTS: { mul: 18, div: 18, add: 20, sub: 18 },
@@ -19,7 +19,7 @@ var CONFIG = {
   // ---- Fluency rules ----
   RECENT_ATTEMPTS: 2,          // fluency = average of this many most recent attempts at a level (played once = that one attempt)
   MIN_ATTEMPTS_FOR_FLUENCY: 1, // attempts needed at a level before it can count as fluent (<= RECENT_ATTEMPTS). 1 = one fast try is enough
-  DUST_PER_WEEK: 0.3,          // seconds of "dust" added for each new week since the level was last played (playing it once clears it all)
+  DUST_PER_WEEK: 0.2,          // seconds of "dust" added for each new week since the level was last played (playing it once clears it all)
   TZ_OFFSET_HOURS: 8,          // Perth (WA has no daylight saving). A new week starts Monday 00:00 local time.
   DEFAULT_CUTOFF: 3.0,         // seconds per correct answer; used until the teacher saves cut-offs
   MIN_ATTEMPT_SECONDS: 20,     // games shorter than this (e.g. joined a class round very late) are not saved to profiles. Practice is 30 or 60 s.
@@ -46,12 +46,14 @@ var CONFIG = {
   BALANCE_RESTARTS: 40,        // how many different starting line-ups the balancer tries (more = more even, slightly slower)
 
   // ---- Trophy cabinet ----
-  // Every player on the winning team of a class round gets the same trophy (picked at random from this list).
+  // Every player on the winning team of a class round gets the same BASIC trophy (picked at random from this list).
   // Straight after winning they choose: put it in the cabinet, or re-roll it (see REROLL_*).
   // Each week they keep ONE trophy: at Sunday 00:00 Perth time the one they chose is locked into their cabinet
   // for good and the rest of that week's trophies are cleared. If they didn't choose, their best one is kept
-  // (platinum first, then the newest).
-  // The emoji are shown gold (or platinum) on screen by CSS filters in css/style.css, so any emoji works here.
+  // (highest tier first: ebony, pearl, platinum, basic; then the newest).
+  // Each student picks one locked-in trophy as their SHOWCASE trophy, shown on their plinth in the Trophy room
+  // (if they haven't picked, their best locked-in trophy is shown).
+  // The emoji are coloured on screen by CSS filters in css/style.css, so any emoji works here.
   TROPHIES: [
     ['🏆', 'Golden Cup'], ['👑', 'Crown of Olympus'], ['🦉', 'Owl of Athena'], ['⚡', 'Thunderbolt of Zeus'],
     ['🔱', 'Trident of Poseidon'], ['🏺', 'Golden Amphora'], ['🐎', 'Golden Pegasus'], ['🦁', 'Nemean Lion'],
@@ -62,8 +64,17 @@ var CONFIG = {
     ['🥇', 'Olympic Gold'], ['🌟', 'Star of Olympus'], ['🐬', 'Dolphin of Apollo'], ['🗿', 'Head of the Titan']
   ],
   TROPHY_SHELF_MAX: 60,        // most trophies held in one week before the weekly keep (oldest drop off first)
-  REROLL_PLATINUM_CHANCE: 0.05, // re-roll: chance the trophy becomes platinum
-  REROLL_LOSE_CHANCE: 0.95,     // re-roll: chance the trophy is lost. Anything left over (1 - both) = stays gold and can be re-rolled again
+
+  // Re-roll ladder. A trophy can only be re-rolled one step up at a time:
+  //   basic -> platinum (20%), platinum -> pearl (10%), pearl -> ebony (5%). Ebony is the top and can't be re-rolled.
+  // A re-roll that doesn't come up = the trophy is LOST. After each successful step the student chooses again:
+  // keep it, or risk it for the next step. The odds are the same for every student (they are not shown on screen;
+  // students are told more fluent levels help, and see a "re-roll power" bar of their fluent levels — Haydn's design).
+  REROLL_LADDER: [
+    { from: 'basic', to: 'plat',  name: 'Platinum', chance: 0.20 },
+    { from: 'plat',  to: 'pearl', name: 'Pearl',    chance: 0.10 },
+    { from: 'pearl', to: 'ebony', name: 'Ebony',    chance: 0.05 }
+  ],
 
   // ---- Timing / traffic ----
   START_DELAY_MS: 8000,        // countdown before a class game starts. Must be longer than the student lobby poll (js/config.js)
