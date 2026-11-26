@@ -140,6 +140,8 @@
 - Tests: 150 (class overview arrays). Checked in Chrome demo mode with seeded profiles. Not checked on a real iPad.
 - Not specified by Haydn, chosen here: shared scale per operation; the cut-off line and current-level marker.
 
+- **Update (26 Nov, Haydn):** every y axis is capped at 10 s (`GRAPH.SLOW`); slower times are drawn at 10 s and the tooltip shows the true time. Replaces the shared per-operation scale. Front end only (no Code.gs change). Never-tried columns are therefore always drawn at 10 s.
+
 ## Assumptions to confirm with Haydn
 - Winner = lowest team time per correct answer (as specified), including 1 s per wrong answer (v9).
 - v9: wrong answers after the last correct answer still add 1 s; the penalty also applies to practice and fluency levels; no weekly choice → best trophy (highest tier, then newest) is kept; undecided trophies can still be decided in the cabinet until the week locks.

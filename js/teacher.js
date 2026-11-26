@@ -383,8 +383,6 @@
     });
   }
 
-  function niceTop(v) { return v <= 10 ? 10 : v <= 20 ? Math.ceil(v / 2) * 2 : Math.ceil(v / 5) * 5; }
-
   function graphSvg(op, c, top, cutoff, name) {
     var G = GRAPH, cols = graphColumns(c), n = cols.length;
     var w = G.LEFT + n * G.SLOT + 2, h = G.TOP + G.H + G.BOTTOM, base = G.TOP + G.H;
@@ -400,7 +398,6 @@
       // rounded top, square base
       out += '<path class="sg-bar" fill="' + fill + '" d="M' + x + ' ' + base + 'V' + (yt + r) + 'Q' + x + ' ' + yt + ' ' + (x + r) + ' ' + yt +
              'H' + (x + G.BAR - r) + 'Q' + (x + G.BAR) + ' ' + yt + ' ' + (x + G.BAR) + ' ' + (yt + r) + 'V' + base + 'Z"/>';
-      if (col.tried && col.h > top) out += '<text class="sg-ax" x="' + (x + G.BAR / 2) + '" y="' + (G.TOP - 3) + '" text-anchor="middle">▲</text>';
       var tip = 'L' + col.level + ' ' + Levels.title(op, col.level) + ' — ' +
         (col.tried ? col.t.toFixed(2) + ' s' + (col.dust ? ' (🧹 dust included)' : '') : 'not tried yet');
       out += '<rect class="sg-hit" x="' + (x - 1) + '" y="0" width="' + G.SLOT + '" height="' + (base + 2) + '" data-tip="' + esc(tip) + '"/>';
@@ -427,20 +424,15 @@
     roomEl().innerHTML = '<div class="card"><div class="spinner"></div></div>';
     call('classOverview').then(function (r) {
       var old = r.rows.length && !r.rows[0].add.t;
-      // Same y scale for every student within an operation, so heights can be compared down the page.
-      var tops = {};
-      Levels.ORDER.forEach(function (op) {
-        var m = GRAPH.SLOW;
-        if (!old) r.rows.forEach(function (row) { graphColumns(row[op]).forEach(function (c) { if (c.h > m) m = c.h; }); });
-        tops[op] = niceTop(m);
-      });
+      // Every graph's y axis stops at 10 s (GRAPH.SLOW): anything slower is drawn at 10 s; the tooltip shows the true time.
+      var top = GRAPH.SLOW;
       var key = '<div class="sg-key"><span>Fluency time per level:</span>' +
         '<span class="sg-grad"></span><span>' + GRAPH.FAST + ' s or faster → ' + GRAPH.SLOW + ' s or slower</span>' +
         '<span class="sg-sw" style="background:' + GRAPH.UNTRIED + '"></span><span>not tried yet</span>' +
         '<span class="sg-cutkey"></span><span>cut-off</span><span class="sg-nowkey">▲</span><span>current level</span></div>';
       roomEl().innerHTML = '<div class="card"><div class="row-between"><h2>📊 Class levels</h2><button class="btn ghost" id="back">← Back to game</button></div>' +
         '<p class="muted">One column per level (Level 1 on the left). Height and colour = fluency time, dust included. Never-tried levels are dark red and drawn at ' + GRAPH.SLOW +
-        ' s or the student\'s slowest time for that operation, whichever is higher. Each operation uses the same scale for every student. Point at a column for details.</p>' +
+        ' s. Every graph stops at ' + GRAPH.SLOW + ' s, so anything slower looks like ' + GRAPH.SLOW + ' s. Point at a column for its true time.</p>' +
         (old ? '<p class="warn">The graphs need the new server code (version ' + C.SERVER_VERSION + '). Paste the new Code.gs into Apps Script and deploy a new version.</p>' : '') +
         key +
         '<div class="table-wrap"><div class="sg-grid-wrap"><div class="sg-row sg-head"><div></div>' +
@@ -452,7 +444,7 @@
             Levels.ORDER.map(function (op) {
               var c = row[op];
               var cap = c.mastered ? '🏆 All fluent' : 'Now L' + c.level;
-              return '<div class="sg-cell">' + (old ? '' : graphSvg(op, c, tops[op], r.cutoffs[op], row.name)) + '<small>' + cap + '</small></div>';
+              return '<div class="sg-cell">' + (old ? '' : graphSvg(op, c, top, r.cutoffs[op], row.name)) + '<small>' + cap + '</small></div>';
             }).join('') + '</div>';
         }).join('') + '</div></div>' +
         '<p class="muted small">Forgotten passwords: look in the Students sheet, or use 🔑 Passwords (or Reset password here) so they create a new one next time they log in.</p></div>';
