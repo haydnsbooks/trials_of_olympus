@@ -244,7 +244,10 @@ var ACTIONS = {
         var sum = opSummary_(profiles[s.id], op, cut[op], now);
         var cur = sum.levels[sum.current - 1];
         row.hasPassword = !!s.password;
-        row[op] = { level: sum.current, mastered: sum.mastered, time: cur.time, dust: cur.dust };
+        row[op] = { level: sum.current, mastered: sum.mastered, time: cur.time, dust: cur.dust,
+                    // Every level's fluency time (dust included; null = never tried) and dust flag, for the Class levels graphs (v15).
+                    t: sum.levels.map(function (l) { return l.time; }),
+                    d: sum.levels.map(function (l) { return l.dust > 0 ? 1 : 0; }) };
       });
       return row;
     }).sort(function (a, b) { return a.name.localeCompare(b.name); });

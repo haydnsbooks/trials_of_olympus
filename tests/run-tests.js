@@ -362,6 +362,16 @@ test('class overview', () => {
   const rows = ok(call({ action: 'classOverview', teacherToken: teacher })).rows;
   assert.strictEqual(rows.length, 12);
   assert(rows[0].mul.level >= 1);
+  // v15 graphs: every level's time per operation (null = never tried), plus dust flags
+  const counts = { add: 20, sub: 18, mul: 18, div: 18 };
+  rows.forEach(row => Object.keys(counts).forEach(op => {
+    assert.strictEqual(row[op].t.length, counts[op], op + ' times length');
+    assert.strictEqual(row[op].d.length, counts[op], op + ' dust length');
+    row[op].t.forEach(t => assert(t === null || typeof t === 'number'));
+    const cur = row[op].t[row[op].level - 1];
+    assert.strictEqual(cur, row[op].time, 'current level time matches its column');
+  }));
+  assert(rows.some(row => ['add', 'sub', 'mul', 'div'].some(op => row[op].t.some(t => t !== null))), 'no played levels in overview');
 });
 
 /* ---------- 3. Dust ---------- */
@@ -975,7 +985,7 @@ test('server version in Code.gs matches js/config.js (otherwise the teacher page
   const page = fs.readFileSync(path.join(ROOT, 'js/config.js'), 'utf8').match(/SERVER_VERSION:\s*(\d+)/);
   assert(page, 'SERVER_VERSION missing from js/config.js');
   assert.strictEqual(ok(call({ action: 'teacherInfo', teacherToken: teacher })).rules.serverVersion, Number(page[1]));
-  assert.strictEqual(Number(page[1]), 14);
+  assert.strictEqual(Number(page[1]), 15);
 });
 
 console.log(failures ? '\n' + failures + ' FAILED\n' : '\nAll tests passed\n');

@@ -629,3 +629,27 @@ select:focus, input:focus { outline: none; border-color: var(--gold); }
 .btn.reroll.pearl { background: linear-gradient(180deg, #fff5fb, #ecc8de); box-shadow: 0 4px 0 #b78ca8; }
 .btn.reroll.ebony { background: linear-gradient(180deg, #4a3a6e, #1b1330); color: #f0e6ff; box-shadow: 0 4px 0 #0b0716; }
 .decide-odds { display: block; }
+
+/* ---------- Class levels graphs (v15): one little column graph per student per operation ---------- */
+.sg-grid-wrap { min-width: 980px; }
+.sg-row { display: grid; grid-template-columns: 170px repeat(4, minmax(190px, 1fr)); gap: 14px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.sg-head { font-family: var(--display); font-size: .95rem; align-items: end; border-bottom-width: 2px; }
+.sg-head small, .sg-name small, .sg-cell small { display: block; color: var(--muted); font-weight: 600; font-family: var(--body); font-size: .8rem; }
+.sg-name .btn { margin-top: 4px; }
+.sg-cell { text-align: center; }
+.sg-chart { display: block; width: 100%; height: auto; max-width: 260px; margin: 0 auto; overflow: visible; }
+.sg-ax { font: 700 7px var(--body); fill: var(--muted); }
+.sg-grid { stroke: var(--line); stroke-width: .6; }
+.sg-base { stroke: #9aa2b8; stroke-width: .8; }
+.sg-cut { stroke: var(--gold-deep); stroke-width: .8; stroke-dasharray: 2 1.5; pointer-events: none; }
+.sg-now { fill: var(--ink); }
+.sg-hit { fill: transparent; cursor: pointer; }
+.sg-hit:hover { fill: rgba(26, 33, 66, .07); }
+.sg-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: .85rem; color: var(--muted); font-weight: 700; margin: 6px 0 10px; }
+.sg-grad { display: inline-block; width: 90px; height: 12px; border-radius: 3px;
+  background: linear-gradient(90deg, hsl(130,72%,40%), hsl(98,72%,43%), hsl(65,72%,45%), hsl(33,72%,43%), hsl(0,72%,40%)); }
+.sg-sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-left: 10px; }
+.sg-cutkey { display: inline-block; width: 18px; border-top: 2px dashed var(--gold-deep); margin-left: 10px; }
+.sg-nowkey { margin-left: 10px; color: var(--ink); font-size: .7rem; }
+.sg-tip { position: fixed; display: none; z-index: 50; pointer-events: none; background: var(--ink); color: #fff; font: 700 .85rem var(--body);
+  padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); white-space: nowrap; }

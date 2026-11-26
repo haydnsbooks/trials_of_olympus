@@ -133,6 +133,13 @@
 - Tests: 149 (all v13 tests plus dust 0.2, ladder with set dice incl. misses at each step, ~20/10/5% per step over 40,000 rolls each, no chances sent, highest-tier auto-keep, old-platinum migration, showcase rules, trophy room content/sort/privacy/no sheet write). Checked in Chrome demo mode (on the pre-merge copy): menu meter, win-screen power bar, platinum → pearl → ebony with recolouring, confirm box text, showcase, trophy room drag both ways and touch drag, phone width. Not checked on a real iPad.
 - To confirm with Haydn: the Trophy room shows real names; students with no locked-in trophy get no plinth; re-rolls can also be done later from the cabinet until the week locks.
 
+## v15 changes (26 Nov 2026, Haydn's request) — SERVER_VERSION 15
+- **Class levels page = little column graphs** (`showOverview`, `graphSvg`, `graphColumns`, `timeColour` in `js/teacher.js`; `.sg-*` styles at the bottom of `css/style.css`). One row per student, one graph per operation, one column per level (20 for +, 18 for −, ×, ÷). Height = fluency time (dust included, the same time as everywhere else). Colour: 3 s or faster green → yellow/orange → 10 s or slower red (`GRAPH.FAST` / `GRAPH.SLOW`). Never-tried levels: dark red (`GRAPH.UNTRIED`), height = 10 s or the student's slowest time for that operation, whichever is greater.
+- Each operation uses one y scale for the whole class (at least 10 s, rounded up to fit the tallest column), so heights compare down the page; a column above the top would get a ▲ (can't happen with the shared scale). Also shown: dashed gold cut-off line, ▲ under the current level, "Now L n" / "🏆 All fluent", hover/tap tooltip with level name and time (🧹 if dust). Reset password buttons kept.
+- Server: `classOverview` now also sends `t` (every level's time, null = never tried) and `d` (dust flags) per operation. With an old server the page says to update Code.gs.
+- Tests: 150 (class overview arrays). Checked in Chrome demo mode with seeded profiles. Not checked on a real iPad.
+- Not specified by Haydn, chosen here: shared scale per operation; the cut-off line and current-level marker.
+
 ## Assumptions to confirm with Haydn
 - Winner = lowest team time per correct answer (as specified), including 1 s per wrong answer (v9).
 - v9: wrong answers after the last correct answer still add 1 s; the penalty also applies to practice and fluency levels; no weekly choice → best trophy (highest tier, then newest) is kept; undecided trophies can still be decided in the cabinet until the week locks.
